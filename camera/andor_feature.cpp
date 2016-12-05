@@ -59,3 +59,20 @@ void ANDOR_Camera::ANDOR_Feature::setName(const wstring &name)
         return;
     }
 }
+
+
+
+template<typename T>
+typename std::enable_if<std::is_floating_point<T>::value, T&>::type
+ANDOR_Camera::ANDOR_Feature::operator=(const T &value)
+{
+
+}
+
+
+template<typename T>
+typename std::enable_if<(std::is_integral<T>::value && !std::is_same<T,bool>::value ), T&>::type
+ANDOR_Camera::ANDOR_Feature::operator=(const T &value)
+{
+
+}

@@ -38,6 +38,17 @@ protected:
 
         void setDeviceHndl(const AT_H hndl);
 
+                // get feature value operators
+
+                // set feature value operators
+        template<typename T>
+        typename std::enable_if<std::is_floating_point<T>::value, T&>::type
+        operator=(const T &value);
+
+        template<typename T>
+        typename std::enable_if<(std::is_integral<T>::value && !std::is_same<T,bool>::value ), T&>::type
+        operator=(const T &value);
+
     private:
         AT_H deviceHndl;
         AT_WC* featureName;
