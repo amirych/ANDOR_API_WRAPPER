@@ -7,6 +7,8 @@
 
 #include "andor_camera.h"
 
+#include <typeinfo>
+
 static std::wstring trim_str(const std::wstring &str)
 {
     size_t first = str.find_first_not_of(' ');
@@ -26,10 +28,9 @@ ANDOR_Camera::ANDOR_Feature::ANDOR_Feature():
 
 
 ANDOR_Camera::ANDOR_Feature::ANDOR_Feature(const AT_H device_hndl, const wstring &name):
-    deviceHndl(device_hndl), featureName(nullptr), featureNameStr(name)
+    deviceHndl(device_hndl), featureName(nullptr), featureNameStr(std::wstring())
 {
     setName(name);
-    featureName = (AT_WC*) featureNameStr.c_str();
 }
 
 
@@ -58,8 +59,28 @@ void ANDOR_Camera::ANDOR_Feature::setName(const wstring &name)
     if ( trim_str(name).empty() ) { // !!!!! TO DO: throw an exception!!
         return;
     }
+
+    featureNameStr = name;
+    featureName = (AT_WC*) featureNameStr.c_str();
 }
 
+
+void ANDOR_Camera::ANDOR_Feature::setName(const wchar_t *name)
+{
+    setName(std::wstring(name));
+}
+
+
+void ANDOR_Camera::ANDOR_Feature::setDeviceHndl(const AT_H hndl)
+{
+    deviceHndl = hndl;
+}
+
+
+AT_H ANDOR_Camera::ANDOR_Feature::getDeviceHndl() const
+{
+    return deviceHndl;
+}
 
 
 template<typename T>
@@ -76,3 +97,40 @@ ANDOR_Camera::ANDOR_Feature::operator=(const T &value)
 {
 
 }
+
+
+bool & ANDOR_Camera::ANDOR_Feature::operator = (const bool & value)
+{
+
+}
+
+
+std::wstring & ANDOR_Camera::ANDOR_Feature::operator = (const std::wstring & value)
+{
+;
+}
+
+
+template<typename T, typename TT>
+//typename std::enable_if<std::is_arithmetic<T>::value, T>::type>
+ANDOR_Camera::ANDOR_Feature::operator T()
+{
+    switch (typeid(T)) {
+    case typeid(std::is_integral<T>::value): {
+        break;
+    }
+    case typeid(std::is_floating_point<T>::value): {
+        break;
+    }
+
+    }
+}
+
+//template<>
+//ANDOR_Camera::ANDOR_Feature::operator std::wstring()
+//{
+
+//}
+
+
+
