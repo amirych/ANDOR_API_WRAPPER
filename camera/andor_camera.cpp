@@ -1,17 +1,20 @@
 #include "andor_camera.h"
 
+
                             /*************************************
                              *                                   *
                              * ANDOR_Camera CLASS IMPLEMENTATION *
                              *                                   *
                              *************************************/
-
+extern ANDOR_Camera::AndorFeatureNameMap  DEFAULT_ANDOR_SDK_FEATURES; // pre-defined SDK features "name-type" std::map
 
                 /*  STATIC MEMBERS INITIALIZATION   */
 
-list<ANDOR_CameraInfo> ANDOR_Camera::foundCameras = list<ANDOR_CameraInfo>();
-list<int> ANDOR_Camera::openedCameraIndices = list<int>();
+std::list<ANDOR_CameraInfo> ANDOR_Camera::foundCameras = std::list<ANDOR_CameraInfo>();
+std::list<int> ANDOR_Camera::openedCameraIndices = std::list<int>();
 size_t ANDOR_Camera::numberOfCreatedObjects = 0;
+
+ANDOR_Camera::AndorFeatureNameMap ANDOR_Camera::ANDOR_SDK_FEATURES = ANDOR_Camera::AndorFeatureNameMap(DEFAULT_ANDOR_SDK_FEATURES);
 
 ANDOR_Camera::ANDOR_Feature ANDOR_Camera::DeviceCount(AT_HANDLE_SYSTEM,L"DeviceCount");
 ANDOR_Camera::ANDOR_Feature ANDOR_Camera::SoftwareVersion(AT_HANDLE_SYSTEM,L"SoftwareVersion");
@@ -24,9 +27,23 @@ ANDOR_Camera::ANDOR_Camera():
     lastError(AT_SUCCESS), cameraLog(nullptr), cameraHndl(AT_HANDLE_SYSTEM),
     CameraPresent(L"CameraPresent"), CameraAcquiring(L"CameraAcquiring"), cameraFeature()
 {
-//    cameraFeature = 100;
+    // camera handler for "CameraPresent"
+    // and "CameraAcquiring" features will be
+    // set in connectToCamera method as at this point there is still no camera handle!!!
+
+    if ( !numberOfCreatedObjects ) {
+        AT_InitialiseLibrary();
+        scanConnectedCameras();
+    }
+
+    //    cameraFeature = 100;
 }
 
+
+
+ANDOR_Camera::~ANDOR_Camera()
+{
+}
 
 
                     /*  PUBLIC METHODS  */
@@ -100,6 +117,24 @@ int ANDOR_Camera::scanConnectedCameras()
 }
 
 
+ANDOR_Camera::ANDOR_Feature & ANDOR_Camera::operator [](const std::wstring &feature_name)
+{
+    auto it = ANDOR_SDK_FEATURES.find(feature_name);
+
+    if ( it != ANDOR_SDK_FEATURES.end() ) {
+        cameraFeature.setType(it->second);
+        return cameraFeature;
+    }
+
+    cameraFeature.setType(UnknownType);
+    throw AndorSDK_Exception(AT_ERR_NOTIMPLEMENTED,"Unknown ANDOR SDK feature!");
+}
+
+
+/*  STATIC PUBLIC METHODS  */
+
+/*  STATIC PROTECTED METHODS  */
+
 
 
                     /*  ANDOR_CameraInfo constructor */
@@ -108,4 +143,20 @@ ANDOR_CameraInfo::ANDOR_CameraInfo():
     cameraModel(L"Unknown"), cameraName(L"Unknown"), serialNumber(L"Unknown"),
     controllerID(L"Unknown"), interfaceType(L"Unknown"), device_index(-1)
 {
+}
+
+
+
+                /*  ANDOR SDK STRING AND ENUMERATED FEATURE CLASSES IMPLEMENTATION  */
+
+ANDOR_StringFeature::ANDOR_StringFeature(): std::wstring()
+{
+
+}
+
+
+ANDOR_StringFeature::ANDOR_StringFeature(ANDOR_Camera::ANDOR_Feature &feature):
+    std::wstring(feature.operator std::wstring())
+{
+
 }
