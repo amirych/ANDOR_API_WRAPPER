@@ -149,7 +149,7 @@ ANDOR_CameraInfo::ANDOR_CameraInfo():
 
                 /*  ANDOR SDK STRING AND ENUMERATED FEATURE CLASSES IMPLEMENTATION  */
 
-ANDOR_StringFeature::ANDOR_StringFeature(): std::wstring()
+ANDOR_StringFeature::ANDOR_StringFeature()
 {
 
 }
@@ -159,4 +159,17 @@ ANDOR_StringFeature::ANDOR_StringFeature(ANDOR_Camera::ANDOR_Feature &feature):
     std::wstring(feature.operator std::wstring())
 {
 
+}
+
+
+ANDOR_EnumFeature::ANDOR_EnumFeature(): _index(-1)
+{
+
+}
+
+
+ANDOR_EnumFeature::ANDOR_EnumFeature(ANDOR_Camera::ANDOR_Feature &feature):
+    std::wstring(feature.operator std::wstring())
+{
+    _index = feature;
 }

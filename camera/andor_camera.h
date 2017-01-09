@@ -10,6 +10,7 @@
 #include <list>
 #include <map>
 #include <iostream>
+#include <sstream>
 
 //using namespace std;
 
@@ -18,10 +19,14 @@ typedef int andor_enum_index_t; // type for ANDOR SDK enumerated feature index
 const int ANDOR_SDK_ENUM_FEATURE_STRLEN = 30;
 
 
-class ANDOR_CameraInfo;  // just forward declaration
+class ANDOR_CameraInfo;      // just forward declaration
+class ANDOR_StringFeature;
+class ANDOR_EnumFeature;
 
 
+                    /************************************/
                     /*  ANDOR CAMERA CLASS DECLARATION  */
+                    /************************************/
 
 class ANDOR_API_WRAPPER_EXPORT ANDOR_Camera
 {
@@ -66,8 +71,8 @@ protected:
 
         std::string getLastLogMessage() const;
 
-                // get feature value operators
 
+                 // get feature value operators
 
         template<typename T, typename = typename std::enable_if<std::is_arithmetic<T>::value>::type>
         operator T()
@@ -89,7 +94,7 @@ protected:
                     ret_val = T(at_bool);
                     break;
                 }
-                case ANDOR_Camera::EnumType: {
+                case ANDOR_Camera::EnumType: { // get index of enumerated feature
                     getEnumIndex();
                     ret_val = T(at_index);
                     break;
@@ -98,11 +103,11 @@ protected:
             return ret_val;
         }
 
-////        explicit operator std::wstring();
-//        operator std::wstring();
-//        operator AT_64();
+        explicit operator ANDOR_StringFeature();
+        explicit operator ANDOR_EnumFeature();
 
-//                // set feature value operators
+
+                 // set feature value operators
 
         template<typename T>
         using delRef = typename std::remove_reference<T>::type;
@@ -112,28 +117,28 @@ protected:
         {
             switch ( featureType ) {
                 case ANDOR_Camera::IntType: {
-
+                    setInt(val);
+                    return T(at64_val);
                 }
                 case ANDOR_Camera::FloatType: {
-
+                    setFloat(val);
+                    return T(at_float);
                 }
                 case ANDOR_Camera::BoolType: {
-
+                    setBool(val);
+                    return T(at_bool);
+                }
+                case ANDOR_Camera::EnumType: {
+                    setEnumIndex(val);
+                    return T(at_index);
                 }
             }
         }
 
-//        template<typename T>
-//        typename std::enable_if<std::is_floating_point<T>::value, T&>::type
-//        operator=(const T &value);
+        ANDOR_StringFeature & operator = (const ANDOR_StringFeature &val);
+        ANDOR_EnumFeature & operator = (const ANDOR_EnumFeature &val);
+        wchar_t * operator = (const wchar_t *val);
 
-//        template<typename T>
-//        typename std::enable_if<(std::is_integral<T>::value && !std::is_same<T,bool>::value ), T&>::type
-//        operator=(const T &value);
-
-//        bool & operator=(const bool &value);
-
-//        std::wstring & operator=(const std::wstring & value);
 
     private:
         operator std::wstring();
@@ -149,13 +154,15 @@ protected:
         };
         std::wstring at_string; // enumerated or string feature
 
-        std::string logMessage;
+        std::stringstream logMessageStream;
 
         void setInt(const AT_64 val);
         void setFloat(const double val);
         void setBool(const bool val);
         void setString(const wchar_t *val);
+        void setString(const std::wstring &val);
         void setEnumString(const wchar_t *val);
+        void setEnumString(const std::wstring &val);
         void setEnumIndex(const andor_enum_index_t val);
 
         void getInt();
@@ -164,6 +171,27 @@ protected:
         void getString();
         void getEnumString();
         void getEnumIndex();
+
+
+        // format log message for ANDOR SDK function calling
+        // (the first argument is the name of SDk function, the others are its arguments)
+        template<typename... T>
+        void formatLogMessage(const std::string &sdk_func, T... args);
+
+        template<typename... T>
+        void formatLogMessage(const char* sdk_func, T... args);
+
+        // helper methods for logging
+        template<typename T1, typename... T2>
+        void logHelper(T1 first, T2... last);
+
+        template<typename T>
+        void logHelper(T arg);
+
+        void logHelper(const std::string &str);
+        void logHelper(const char* str);
+        void logHelper(const std::wstring &wstr);
+        void logHelper(const wchar_t* wstr);
     };
 
                 /*  END OF ANDOR_Feature CLASS DECLARATION  */
@@ -216,8 +244,13 @@ protected:
     static AndorFeatureNameMap ANDOR_SDK_FEATURES;
 
     static int scanConnectedCameras(); // scan connected cameras when the first object will be created
-};
 
+}; // end of ANDOR_Camera class declaration
+
+
+
+
+                /*   DECLARATION OF CLASS FOR ANDOR SDK STRING-TYPE FEATURE PRESENTATION  */
 
 struct ANDOR_API_WRAPPER_EXPORT ANDOR_StringFeature: public std::wstring
 {
@@ -226,6 +259,9 @@ struct ANDOR_API_WRAPPER_EXPORT ANDOR_StringFeature: public std::wstring
     ANDOR_StringFeature(ANDOR_Camera::ANDOR_Feature &feature);
 };
 
+
+
+                /*   DECLARATION OF CLASS FOR ANDOR SDK ENUMERATED-TYPE FEATURE PRESENTATION  */
 
 struct ANDOR_API_WRAPPER_EXPORT ANDOR_EnumFeature: public std::wstring
 {
@@ -265,6 +301,7 @@ struct ANDOR_API_WRAPPER_EXPORT ANDOR_CameraInfo
 
     enum ANDOR_CameraInfoType {CameraModel, CameraName, SerialNumber, ControllerID};
 };
+
 
 
 #endif // ANDOR_CAMERA_H
