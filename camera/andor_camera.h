@@ -58,6 +58,8 @@ protected:
         ANDOR_Feature(const std::wstring &name);
         ANDOR_Feature(const wchar_t* name);
 
+        ANDOR_Feature(ANDOR_Feature && other); // move ctor
+
 //        ~ANDOR_Feature();
 
         void setName(const std::wstring &name);
@@ -77,7 +79,7 @@ protected:
         template<typename T, typename = typename std::enable_if<std::is_arithmetic<T>::value>::type>
         operator T()
         {
-            static delRef<T> ret_val;
+            static T ret_val;
             switch ( featureType ) {
                 case ANDOR_Camera::IntType: {
                     getInt();
@@ -112,32 +114,36 @@ protected:
         template<typename T>
         using delRef = typename std::remove_reference<T>::type;
 
-        template<typename T>
-        typename std::enable_if<std::is_arithmetic<delRef<T>>::value, delRef<T>>::type & operator=(T &&val)
+
+        template<typename T, typename = typename std::enable_if<std::is_arithmetic<delRef<T>>::value, delRef<T>>::type>
+        ANDOR_Feature & operator=(T &&val)
         {
             switch ( featureType ) {
                 case ANDOR_Camera::IntType: {
                     setInt(val);
-                    return T(at64_val);
+                    break;
                 }
                 case ANDOR_Camera::FloatType: {
                     setFloat(val);
-                    return T(at_float);
+                    break;
                 }
                 case ANDOR_Camera::BoolType: {
                     setBool(val);
-                    return T(at_bool);
+                    break;
                 }
                 case ANDOR_Camera::EnumType: {
                     setEnumIndex(val);
-                    return T(at_index);
+                    break;
                 }
             }
+
+            return *this;
         }
 
-        ANDOR_StringFeature & operator = (const ANDOR_StringFeature &val);
-        ANDOR_EnumFeature & operator = (const ANDOR_EnumFeature &val);
-        wchar_t * operator = (const wchar_t *val);
+        ANDOR_Feature & operator = (const ANDOR_StringFeature &val);
+        ANDOR_Feature & operator = (const ANDOR_EnumFeature &val);
+        ANDOR_Feature &  operator = (const std::wstring &val);
+        ANDOR_Feature &  operator = (const wchar_t *val);
 
 
     private:
@@ -183,15 +189,15 @@ protected:
 
         // helper methods for logging
         template<typename T1, typename... T2>
-        void logHelper(T1 first, T2... last);
+        inline void logHelper(T1 first, T2... last);
 
         template<typename T>
-        void logHelper(T arg);
+        inline void logHelper(T arg);
 
-        void logHelper(const std::string &str);
-        void logHelper(const char* str);
-        void logHelper(const std::wstring &wstr);
-        void logHelper(const wchar_t* wstr);
+        inline void logHelper(const std::string &str);
+        inline void logHelper(const char* str);
+        inline void logHelper(const std::wstring &wstr);
+        inline void logHelper(const wchar_t* wstr);
     };
 
                 /*  END OF ANDOR_Feature CLASS DECLARATION  */
@@ -265,8 +271,12 @@ struct ANDOR_API_WRAPPER_EXPORT ANDOR_StringFeature: public std::wstring
 
 struct ANDOR_API_WRAPPER_EXPORT ANDOR_EnumFeature: public std::wstring
 {
+    friend class ANDOR_Camera::ANDOR_Feature;
+
     using std::wstring::wstring;
-    ANDOR_EnumFeature();
+
+    ANDOR_EnumFeature(); // one must init _index member to some invalid value at this point! do not inherite
+                         // default ctor from wstring!
     ANDOR_EnumFeature(ANDOR_Camera::ANDOR_Feature &feature);
 
     andor_enum_index_t index() const;

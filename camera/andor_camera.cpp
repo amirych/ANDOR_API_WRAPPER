@@ -36,7 +36,15 @@ ANDOR_Camera::ANDOR_Camera():
         scanConnectedCameras();
     }
 
-    //    cameraFeature = 100;
+    ANDOR_StringFeature sf,sf1;
+
+    sf1 = (*this)[L"SSS"] = sf = L"EEEE";
+    int ind = (*this)[L"SSS"] = sf = L"EEEE";
+
+    ANDOR_StringFeature ss = (*this)[L"SSSS"];
+    sf = (*this)[L"SSSS"];
+
+    std::wcout << sf;
 }
 
 
@@ -119,15 +127,22 @@ int ANDOR_Camera::scanConnectedCameras()
 
 ANDOR_Camera::ANDOR_Feature & ANDOR_Camera::operator [](const std::wstring &feature_name)
 {
-    auto it = ANDOR_SDK_FEATURES.find(feature_name);
+    auto it = ANDOR_SDK_FEATURES.find(feature_name); // check for valid feature name
 
     if ( it != ANDOR_SDK_FEATURES.end() ) {
         cameraFeature.setType(it->second);
+        cameraFeature.setName(feature_name);
         return cameraFeature;
     }
 
     cameraFeature.setType(UnknownType);
     throw AndorSDK_Exception(AT_ERR_NOTIMPLEMENTED,"Unknown ANDOR SDK feature!");
+}
+
+
+ANDOR_Camera::ANDOR_Feature & ANDOR_Camera::operator [](const wchar_t* feature_name)
+{
+    return operator [](std::wstring(feature_name));
 }
 
 
@@ -149,11 +164,9 @@ ANDOR_CameraInfo::ANDOR_CameraInfo():
 
                 /*  ANDOR SDK STRING AND ENUMERATED FEATURE CLASSES IMPLEMENTATION  */
 
-ANDOR_StringFeature::ANDOR_StringFeature()
+ANDOR_StringFeature::ANDOR_StringFeature(): std::wstring()
 {
-
 }
-
 
 ANDOR_StringFeature::ANDOR_StringFeature(ANDOR_Camera::ANDOR_Feature &feature):
     std::wstring(feature.operator std::wstring())
@@ -162,7 +175,11 @@ ANDOR_StringFeature::ANDOR_StringFeature(ANDOR_Camera::ANDOR_Feature &feature):
 }
 
 
-ANDOR_EnumFeature::ANDOR_EnumFeature(): _index(-1)
+
+
+
+ANDOR_EnumFeature::ANDOR_EnumFeature():
+    std::wstring(), _index(-1)
 {
 
 }
@@ -171,5 +188,7 @@ ANDOR_EnumFeature::ANDOR_EnumFeature(): _index(-1)
 ANDOR_EnumFeature::ANDOR_EnumFeature(ANDOR_Camera::ANDOR_Feature &feature):
     std::wstring(feature.operator std::wstring())
 {
-    _index = feature;
+    _index = feature.at_index;
 }
+
+

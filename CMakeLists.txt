@@ -7,6 +7,7 @@ set(CMAKE_CXX_STANDARD 11)
 set(ANDOR_API_WRAPPER_LIB andor_api_wrapper)
 aux_source_directory(./camera/ ANDOR_API_WRAPPER_SRC)
 add_library(${ANDOR_API_WRAPPER_LIB} SHARED ${ANDOR_API_WRAPPER_SRC})
+target_link_libraries(${ANDOR_API_WRAPPER_LIB} atcore)
 
 
 set(TEST_PROG test_prog)

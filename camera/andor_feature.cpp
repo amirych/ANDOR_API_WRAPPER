@@ -34,6 +34,7 @@ ANDOR_Camera::ANDOR_Feature::ANDOR_Feature():
 ANDOR_Camera::ANDOR_Feature::ANDOR_Feature(const AT_H device_hndl, const std::wstring &name):
     ANDOR_Feature()
 {
+    setDeviceHndl(device_hndl);
     setName(name);
 }
 
@@ -60,10 +61,12 @@ ANDOR_Camera::ANDOR_Feature::ANDOR_Feature(const wchar_t *name):
 
 void ANDOR_Camera::ANDOR_Feature::setName(const std::wstring &name)
 {
-    if ( trim_str(name).empty() ) { // !!!!! TO DO: throw an exception!!
-        return;
-    }
+//    if ( trim_str(name).empty() ) { // !!!!! TO DO: throw an exception!!
+//        return;
+//    }
 
+    // suppose the 'name' is already valid name of SDK feature!!! (see, e.g., ANDOR_Camera::operator[])
+    // If the 'name' is not valid name then an error will occur after SDK function calling
     featureNameStr = name;
     featureName = (AT_WC*) featureNameStr.c_str();
 }
@@ -107,7 +110,9 @@ ANDOR_Camera::ANDOR_Feature::operator ANDOR_StringFeature()
 
     getString();
 
-//    return at_string;
+    ANDOR_StringFeature f(at_string.c_str());
+
+    return f;
 }
 
 
@@ -119,7 +124,10 @@ ANDOR_Camera::ANDOR_Feature::operator ANDOR_EnumFeature()
 
     getEnumString();
 
-//    return at_string;
+    ANDOR_EnumFeature f(at_string.c_str());
+    f._index = at_index;
+
+    return f;
 }
 
 
@@ -344,8 +352,47 @@ void ANDOR_Camera::ANDOR_Feature::setEnumIndex(const andor_enum_index_t val)
 }
 
 
+//ANDOR_StringFeature & ANDOR_Camera::ANDOR_Feature::operator = (const ANDOR_StringFeature &val)
+//{
+//    setString(val);
+
+//    static ANDOR_StringFeature f(at_string.c_str());
+
+//    return f;
+//}
+ANDOR_Camera::ANDOR_Feature & ANDOR_Camera::ANDOR_Feature::operator = (const ANDOR_StringFeature &val)
+{
+    setString(val);
+
+    return *this;
+}
 
 
+ANDOR_Camera::ANDOR_Feature & ANDOR_Camera::ANDOR_Feature::operator = (const ANDOR_EnumFeature &val)
+{
+    setEnumString(val);
+
+    return *this;
+}
+
+
+ANDOR_Camera::ANDOR_Feature & ANDOR_Camera::ANDOR_Feature::operator = (const wchar_t* val)
+{
+    switch ( featureType ) {
+        case ANDOR_Camera::StringType:
+            return operator = (ANDOR_StringFeature(val));
+        case ANDOR_Camera::EnumType:
+            return operator = (ANDOR_EnumFeature(val));
+        default:
+            throw AndorSDK_Exception(AT_ERR_NOTIMPLEMENTED,"Feature type missmatch!");
+    }
+
+}
+
+ANDOR_Camera::ANDOR_Feature & ANDOR_Camera::ANDOR_Feature::operator = (const std::wstring &val)
+{
+    return operator = (val.c_str());
+}
 
                                 /*  auxiliary methods  */
 
