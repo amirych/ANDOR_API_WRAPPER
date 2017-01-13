@@ -11,12 +11,22 @@
 #include <map>
 #include <iostream>
 #include <sstream>
+#include <functional>
 
 //using namespace std;
 
+// actually, AT_WC is wchar_t according to declaration in atcore.h
+// to follow strategy of generalized SDK wrapper (in sence of hidding actuall data-types used in
+// SDK functions) one should declarate a string type to work with name of SDK feature and
+// representation of string- and enumated-type values
+
+typedef std::basic_string<AT_WC> andor_string_t;
+
 typedef int andor_enum_index_t; // type for ANDOR SDK enumerated feature index
 
-const int ANDOR_SDK_ENUM_FEATURE_STRLEN = 30;
+#define ANDOR_CAMERA_LOG_IDENTATION 3
+
+const int ANDOR_SDK_ENUM_FEATURE_STRLEN = 30; // maximal length of string for enumerated feature
 
 
 class ANDOR_CameraInfo;      // just forward declaration
@@ -32,12 +42,14 @@ class ANDOR_API_WRAPPER_EXPORT ANDOR_Camera
 {
     friend class ANDOR_StringFeature;
     friend class ANDOR_EnumFeature;
+
 public:
-    enum LOG_IDENTIFICATOR {CAMERA_INFO, SDK_ERROR, CAMERA_ERROR};
+    enum LOG_IDENTIFICATOR {CAMERA_INFO, SDK_ERROR, CAMERA_ERROR, BLANK};
     enum LOG_LEVEL {LOG_LEVEL_VERBOSE, LOG_LEVEL_ERROR, LOG_LEVEL_QUIET};
     enum AndorFeatureType {UnknownType = -1, BoolType, IntType, FloatType, StringType, EnumType};
+    enum CAMERA_IDENT_TAG {CameraModel, CameraName, SerialNumber, ControllerID};
 
-    typedef std::map<std::wstring,AndorFeatureType> AndorFeatureNameMap;
+    typedef std::map<andor_string_t,AndorFeatureType> AndorFeatureNameMap;
 
     explicit ANDOR_Camera();
     virtual ~ANDOR_Camera();
@@ -52,18 +64,18 @@ protected:
         friend class ANDOR_EnumFeature;
     public:
         ANDOR_Feature();
-        ANDOR_Feature(const AT_H device_hndl, const std::wstring &name = std::wstring());
-        ANDOR_Feature(const AT_H device_hndl, const wchar_t* name = nullptr);
+        ANDOR_Feature(const AT_H device_hndl, const andor_string_t &name = andor_string_t());
+        ANDOR_Feature(const AT_H device_hndl, const AT_WC* name = nullptr);
 
-        ANDOR_Feature(const std::wstring &name);
-        ANDOR_Feature(const wchar_t* name);
+        ANDOR_Feature(const andor_string_t &name);
+        ANDOR_Feature(const AT_WC* name);
 
         ANDOR_Feature(ANDOR_Feature && other); // move ctor
 
 //        ~ANDOR_Feature();
 
-        void setName(const std::wstring &name);
-        void setName(const wchar_t* name);
+        void setName(const andor_string_t &name);
+        void setName(const AT_WC* name);
 
         void setDeviceHndl(const AT_H hndl);
         AT_H getDeviceHndl() const;
@@ -142,15 +154,15 @@ protected:
 
         ANDOR_Feature & operator = (const ANDOR_StringFeature &val);
         ANDOR_Feature & operator = (const ANDOR_EnumFeature &val);
-        ANDOR_Feature &  operator = (const std::wstring &val);
+        ANDOR_Feature &  operator = (const andor_string_t &val);
         ANDOR_Feature &  operator = (const wchar_t *val);
 
 
     private:
-        operator std::wstring();
+        operator andor_string_t();
         AT_H deviceHndl;
         AT_WC* featureName;
-        std::wstring featureNameStr;
+        andor_string_t featureNameStr;
         AndorFeatureType featureType;
         union {
             AT_64 at64_val;  // integer feature
@@ -158,17 +170,18 @@ protected:
             double at_float; // floating-point feature
             andor_enum_index_t at_index; // index of enumerated feature
         };
-        std::wstring at_string; // enumerated or string feature
+        andor_string_t at_string; // enumerated or string feature
 
         std::stringstream logMessageStream;
+
 
         void setInt(const AT_64 val);
         void setFloat(const double val);
         void setBool(const bool val);
         void setString(const wchar_t *val);
-        void setString(const std::wstring &val);
+        void setString(const andor_string_t &val);
         void setEnumString(const wchar_t *val);
-        void setEnumString(const std::wstring &val);
+        void setEnumString(const andor_string_t &val);
         void setEnumIndex(const andor_enum_index_t val);
 
         void getInt();
@@ -180,7 +193,7 @@ protected:
 
 
         // format log message for ANDOR SDK function calling
-        // (the first argument is the name of SDk function, the others are its arguments)
+        // (the first argument is the name of SDK function, the others are its arguments)
         template<typename... T>
         void formatLogMessage(const std::string &sdk_func, T... args);
 
@@ -196,8 +209,8 @@ protected:
 
         inline void logHelper(const std::string &str);
         inline void logHelper(const char* str);
-        inline void logHelper(const std::wstring &wstr);
-        inline void logHelper(const wchar_t* wstr);
+        inline void logHelper(const andor_string_t &wstr);
+        inline void logHelper(const AT_WC* wstr);
     };
 
                 /*  END OF ANDOR_Feature CLASS DECLARATION  */
@@ -208,10 +221,18 @@ public:
     void setLogLevel(const LOG_LEVEL level);
     LOG_LEVEL getLogLevel() const;
 
+    bool connectToCamera(const int device_index, std::ostream *log_file);
+    bool connectToCamera(const ANDOR_Camera::CAMERA_IDENT_TAG ident_tag, const andor_string_t &tag_str, std::ostream *log_file);
+    void disconnectFromCamera();
+
+
             /* operator[] for accessing Andor SDK features (const and non-const versions) */
 
-    ANDOR_Feature& operator[](const std::wstring &feature_name);
-    ANDOR_Feature& operator[](const wchar_t* feature_name);
+    ANDOR_Feature& operator[](const andor_string_t &feature_name);
+    ANDOR_Feature& operator[](const AT_WC* feature_name);
+    ANDOR_Feature& operator[](const std::string &feature_name);
+    ANDOR_Feature& operator[](const char *feature_name);
+
 
             /* Andor SDK global features */
 
@@ -237,8 +258,10 @@ protected:
 
     ANDOR_Feature cameraFeature;
 
-    void logToFile(LOG_IDENTIFICATOR ident, std::string &log_str, int identation = 0);
-    void logToFile(const AndorSDK_Exception &ex, int identation = 0);
+    void logToFile(const LOG_IDENTIFICATOR ident, const std::string &log_str, const int identation = 0); // general logging
+    void logToFile(const LOG_IDENTIFICATOR ident, const char *log_str, const int identation = 0); // general logging
+    void logToFile(const AndorSDK_Exception &ex, const int identation = 0); // SDK error logging
+    void logToFile(const ANDOR_Feature &feature, const int identation = 0); // SDK function calling logging
 
 
                 /*  static class members and methods  */
@@ -251,6 +274,8 @@ protected:
 
     static int scanConnectedCameras(); // scan connected cameras when the first object will be created
 
+    void loggingFuncCallback(const std::string &log_str);
+
 }; // end of ANDOR_Camera class declaration
 
 
@@ -258,9 +283,9 @@ protected:
 
                 /*   DECLARATION OF CLASS FOR ANDOR SDK STRING-TYPE FEATURE PRESENTATION  */
 
-struct ANDOR_API_WRAPPER_EXPORT ANDOR_StringFeature: public std::wstring
+struct ANDOR_API_WRAPPER_EXPORT ANDOR_StringFeature: public andor_string_t
 {
-    using std::wstring::wstring;
+    using andor_string_t::andor_string_t;
     ANDOR_StringFeature();
     ANDOR_StringFeature(ANDOR_Camera::ANDOR_Feature &feature);
 };
@@ -269,11 +294,11 @@ struct ANDOR_API_WRAPPER_EXPORT ANDOR_StringFeature: public std::wstring
 
                 /*   DECLARATION OF CLASS FOR ANDOR SDK ENUMERATED-TYPE FEATURE PRESENTATION  */
 
-struct ANDOR_API_WRAPPER_EXPORT ANDOR_EnumFeature: public std::wstring
+struct ANDOR_API_WRAPPER_EXPORT ANDOR_EnumFeature: public andor_string_t
 {
     friend class ANDOR_Camera::ANDOR_Feature;
 
-    using std::wstring::wstring;
+    using andor_string_t::andor_string_t;
 
     ANDOR_EnumFeature(); // one must init _index member to some invalid value at this point! do not inherite
                          // default ctor from wstring!
@@ -297,15 +322,11 @@ struct ANDOR_API_WRAPPER_EXPORT ANDOR_CameraInfo
     ANDOR_StringFeature cameraName;
     ANDOR_StringFeature serialNumber;
     ANDOR_StringFeature controllerID;
-    //    std::wstring cameraModel;
-    //    std::wstring cameraName;
-    //    std::wstring serialNumber;
-    //    std::wstring controllerID;
     AT_64 sensorWidth;
     AT_64 sensorHeight;
     double pixelWidth; // in micrometers
     double pixelHeight;
-//    std::wstring interfaceType;
+//    andor_string_t interfaceType;
     ANDOR_StringFeature interfaceType;
     int device_index;
 

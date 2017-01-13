@@ -1,12 +1,51 @@
 #include "andor_camera.h"
 
+#include <locale>
+#include <codecvt>
+#include <chrono>
+#include <ctime>
+
 
                             /*************************************
                              *                                   *
                              * ANDOR_Camera CLASS IMPLEMENTATION *
                              *                                   *
                              *************************************/
+
 extern ANDOR_Camera::AndorFeatureNameMap  DEFAULT_ANDOR_SDK_FEATURES; // pre-defined SDK features "name-type" std::map
+
+
+                /*  AUXILIARY NON-MEMBER FUNCTIONS  */
+
+std::string time_stamp()
+{
+    auto now = std::chrono::system_clock::now();
+    auto now_c = std::chrono::system_clock::to_time_t(now);
+
+    char time_stamp[100];
+
+    struct std::tm buff;
+    buff = *std::localtime(&now_c);
+
+    std::strftime(time_stamp,sizeof(time_stamp),"%c",&buff);
+
+    return std::string(time_stamp);
+}
+
+
+            /* CameraPresent feature callback function  */
+
+static int AT_EXP_CONV disconnection_callback(AT_H hndl, AT_WC* name, void* context)
+{
+    if ( context == nullptr ) return AT_ERR_INVALIDHANDLE; // just check (should not be NULL!!!)
+
+    ANDOR_Camera *camera = (ANDOR_Camera*)context;
+    if ( camera == nullptr ) return AT_ERR_INVALIDHANDLE; // just check
+
+    camera->disconnectFromCamera();
+}
+
+
 
                 /*  STATIC MEMBERS INITIALIZATION   */
 
@@ -45,6 +84,7 @@ ANDOR_Camera::ANDOR_Camera():
     sf = (*this)[L"SSSS"];
 
     std::wcout << sf;
+
 }
 
 
@@ -69,6 +109,197 @@ ANDOR_Camera::LOG_LEVEL ANDOR_Camera::getLogLevel() const
 }
 
 
+bool ANDOR_Camera::connectToCamera(const int device_index, std::ostream *log_file)
+{
+    disconnectFromCamera();
+
+    cameraLog = log_file;
+
+    // header of log
+    for (int i = 0; i < 5; ++i) logToFile(ANDOR_Camera::BLANK,"");
+    std::string log_str;
+    log_str.resize(80,'*');
+    logToFile(ANDOR_Camera::BLANK,log_str);
+    logToFile(ANDOR_Camera::BLANK,"                 " + time_stamp());
+    logToFile(ANDOR_Camera::BLANK,log_str);
+
+    logToFile(ANDOR_Camera::CAMERA_INFO,"Try to open a connection to Andor camera ... ");
+
+    bool ok = true;
+    lastError = AT_SUCCESS;
+
+    try {
+        int dev_num = ANDOR_Camera::DeviceCount;
+        if ( logLevel == ANDOR_Camera::LOG_LEVEL_VERBOSE ) {
+
+        }
+
+        log_str = "Number of found cameras: " + std::to_string(dev_num);
+        logToFile(ANDOR_Camera::CAMERA_INFO,log_str,1);
+
+        if ( !dev_num ) {
+            logToFile(ANDOR_Camera::CAMERA_ERROR,"No one camera was detected!!! Can not initiate the connection!!!");
+            lastError = AT_ERR_CONNECTION;
+            return false;
+        }
+
+        log_str = "initiate connection to device with index " + std::to_string(device_index) + " ...";
+        logToFile(ANDOR_Camera::CAMERA_INFO,log_str,1);
+
+        log_str = "AT_Open(" + std::to_string(device_index) + ", &cameraHndl)";
+        andor_sdk_assert( AT_Open(device_index,&cameraHndl), log_str);
+
+        CameraPresent.setDeviceHndl(cameraHndl);
+        ok = CameraPresent;
+        if ( !ok ) { // it is very strange!!!
+            throw AndorSDK_Exception(AT_ERR_CONNECTION,"Connection lost!");
+        }
+
+        log_str = "Connection established! Camera handler is " + std::to_string(cameraHndl);
+        logToFile(ANDOR_Camera::CAMERA_INFO,log_str);
+
+        // initialize features (set working camera handler)
+        CameraAcquiring.setDeviceHndl(cameraHndl);
+        cameraFeature.setDeviceHndl(cameraHndl);
+
+        logToFile(ANDOR_Camera::CAMERA_INFO,"Try to register 'CameraPresent'-feature callback function ...");
+
+        log_str = "AT_RegisterFeatureCallback(" + std::to_string(cameraHndl) + ", L'CameraPresent', " +
+                  "(FeatureCallback)disconnection_callback,(void*)this";
+        andor_sdk_assert( AT_RegisterFeatureCallback(cameraHndl,L"CameraPresent",(FeatureCallback)disconnection_callback,(void*)this),
+                          log_str);
+
+        logToFile(ANDOR_Camera::CAMERA_INFO, "The callback function was registered successfully!");
+
+        return true;
+    } catch ( AndorSDK_Exception &ex) {
+        logToFile(ex);
+        lastError = ex.getError();
+        return false;
+    }
+}
+
+
+bool ANDOR_Camera::connectToCamera(const ANDOR_Camera::CAMERA_IDENT_TAG ident_tag,
+                                   const andor_string_t &tag_str, std::ostream *log_file)
+{
+
+    std::string log_str = "Ask connection to camera by ";
+    switch (ident_tag) {
+        case ANDOR_Camera::CameraModel:
+            log_str += "'CameraModel'";
+            break;
+        case ANDOR_Camera::CameraName:
+            log_str += "'CameraName'";
+            break;
+        case ANDOR_Camera::SerialNumber:
+            log_str += "'SerialNumber'";
+            break;
+        case ANDOR_Camera::ControllerID:
+            log_str += "'ControllerID'";
+            break;
+        default:
+            log_str += "'unknown identifier' tag!!! Cannot open a camera!!!";
+            logToFile(ANDOR_Camera::CAMERA_ERROR,log_str);
+            return false; // unknown type!
+    }
+
+    log_str += " tag ...";
+    logToFile(ANDOR_Camera::CAMERA_INFO,log_str);
+
+    int ok;
+
+    for ( ANDOR_CameraInfo info: foundCameras ) {
+        switch (ident_tag) {
+            case ANDOR_Camera::CameraModel:
+                ok = info.cameraModel.compare(tag_str);
+                break;
+            case ANDOR_Camera::CameraName:
+                ok = info.cameraName.compare(tag_str);
+                break;
+            case ANDOR_Camera::SerialNumber:
+                ok = info.serialNumber.compare(tag_str);
+                break;
+            case ANDOR_Camera::ControllerID:
+                ok = info.controllerID.compare(tag_str);
+                break;
+        }
+
+        if ( !ok ) { // coincidence was found
+            log_str = "The identificator was found! The camera device index is " + std::to_string(info.device_index);
+            logToFile(ANDOR_Camera::CAMERA_INFO,log_str);
+            return connectToCamera(info.device_index, log_file);
+        }
+    }
+
+    // coincidence was not found
+    std::wstring_convert<std::codecvt_utf8<AT_WC>> cvt;
+
+    log_str = "The camera with indentificator '" +  cvt.to_bytes(tag_str) +
+              "' was not found! Can not open a camera connection!";
+    logToFile(ANDOR_Camera::CAMERA_ERROR,log_str);
+
+    return false;
+}
+
+
+void ANDOR_Camera::disconnectFromCamera()
+{
+    logToFile(ANDOR_Camera::CAMERA_INFO, "Try to disconnect from camera");
+
+    if ( CameraAcquiring ) {
+
+    }
+
+    logToFile(ANDOR_Camera::CAMERA_INFO, "Unregistering 'CameraPresent'-feature callback function",1);
+    AT_UnregisterFeatureCallback(cameraHndl,L"CameraPresent",(FeatureCallback)disconnection_callback,nullptr);
+
+    AT_Close(cameraHndl);
+
+    logToFile(ANDOR_Camera::CAMERA_INFO,"Camera disconnected");
+}
+
+
+                    /*  PUBLIC OPERATORS[]  */
+
+ANDOR_Camera::ANDOR_Feature & ANDOR_Camera::operator [](const andor_string_t &feature_name)
+{
+    auto it = ANDOR_SDK_FEATURES.find(feature_name); // check for valid feature name
+
+    if ( it != ANDOR_SDK_FEATURES.end() ) {
+        cameraFeature.setType(it->second);
+        cameraFeature.setName(feature_name);
+        return cameraFeature;
+    }
+
+    cameraFeature.setType(UnknownType);
+    throw AndorSDK_Exception(AT_ERR_NOTIMPLEMENTED,"Unknown ANDOR SDK feature!");
+}
+
+
+ANDOR_Camera::ANDOR_Feature & ANDOR_Camera::operator [](const AT_WC* feature_name)
+{
+    return operator [](andor_string_t(feature_name));
+}
+
+
+
+ANDOR_Camera::ANDOR_Feature & ANDOR_Camera::operator [](const std::string & feature_name)
+{
+    std::wstring_convert<std::codecvt_utf8<AT_WC>> cvt;
+
+    return operator [](cvt.from_bytes(feature_name));
+}
+
+
+ANDOR_Camera::ANDOR_Feature & ANDOR_Camera::operator [](const char* feature_name)
+{
+    std::wstring_convert<std::codecvt_utf8<AT_WC>> cvt;
+
+    return operator [](cvt.from_bytes(feature_name));
+}
+
+
 
                     /*  PROTECTED METHODS  */
 
@@ -87,7 +318,6 @@ int ANDOR_Camera::scanConnectedCameras()
             ANDOR_CameraInfo info;
             ANDOR_Feature feature(hndl,L"CameraModel");
 
-//            info.cameraModel = (std::wstring)feature;
             info.cameraModel = feature;
 
             feature.setName(L"CameraName");
@@ -125,30 +355,80 @@ int ANDOR_Camera::scanConnectedCameras()
 }
 
 
-ANDOR_Camera::ANDOR_Feature & ANDOR_Camera::operator [](const std::wstring &feature_name)
+void ANDOR_Camera::logToFile(const LOG_IDENTIFICATOR ident, const std::string &log_str, const int identation)
 {
-    auto it = ANDOR_SDK_FEATURES.find(feature_name); // check for valid feature name
+    if ( !cameraLog ) return;
+    if ( logLevel == ANDOR_Camera::LOG_LEVEL_QUIET ) return;
 
-    if ( it != ANDOR_SDK_FEATURES.end() ) {
-        cameraFeature.setType(it->second);
-        cameraFeature.setName(feature_name);
-        return cameraFeature;
+
+    std::stringstream str;
+
+    str << "[" << time_stamp() << "] ";
+
+    switch (ident) {
+    case ANDOR_Camera::CAMERA_INFO:
+        str << "[CAMERA INFO";
+        if ( cameraHndl != AT_HANDLE_SYSTEM ) { // camera already connected, add device handler identificator
+            str << ", DEVICE HANDLER " << cameraHndl << "]";
+        } else {
+            str << "]";
+        }
+        break;
+    case ANDOR_Camera::SDK_ERROR:
+        str << "[ANDOR SDK ERROR, DEVICE HANDLER " << cameraHndl << "]";
+        break;
+    case ANDOR_Camera::CAMERA_ERROR:
+        str << "[CAMERA ERROR";
+        if ( cameraHndl != AT_HANDLE_SYSTEM ) { // camera already connected, add device handler identificator
+            str << ", DEVICE HANDLER " << cameraHndl << "]";
+        } else {
+            str << "]";
+        }
+        break;
+    default: // just ignore
+        break;
     }
 
-    cameraFeature.setType(UnknownType);
-    throw AndorSDK_Exception(AT_ERR_NOTIMPLEMENTED,"Unknown ANDOR SDK feature!");
+    std::string tab;
+    tab.resize(ANDOR_CAMERA_LOG_IDENTATION*identation,' ');
+
+    str << tab << log_str;
+
+    *cameraLog << str.str() << std::flush;
 }
 
 
-ANDOR_Camera::ANDOR_Feature & ANDOR_Camera::operator [](const wchar_t* feature_name)
+void ANDOR_Camera::logToFile(const LOG_IDENTIFICATOR ident, const char *log_str, const int identation)
 {
-    return operator [](std::wstring(feature_name));
+    logToFile(ident,std::string(log_str),identation);
 }
 
 
-/*  STATIC PUBLIC METHODS  */
+void ANDOR_Camera::logToFile(const AndorSDK_Exception &ex, const int identation)
+{
+    std::stringstream str;
+    str << ex.what() << " [ANDOR SDK ERROR CODE: " << ex.getError() << "]";
 
-/*  STATIC PROTECTED METHODS  */
+    logToFile(ANDOR_Camera::SDK_ERROR, str.str(), identation);
+}
+
+
+void ANDOR_Camera::logToFile(const ANDOR_Feature &feature, const int identation)
+{
+    logToFile(ANDOR_Camera::CAMERA_INFO, feature.getLastLogMessage(), identation);
+}
+
+
+// print logging message obly if logLevel is verbose!!!
+void ANDOR_Camera::loggingFuncCallback(const std::string &log_str)
+{
+    if ( logLevel == ANDOR_Camera::LOG_LEVEL_VERBOSE ) logToFile(ANDOR_Camera::CAMERA_INFO, log_str);
+}
+
+
+                            /*  STATIC PUBLIC METHODS  */
+
+                            /*  STATIC PROTECTED METHODS  */
 
 
 
@@ -164,12 +444,12 @@ ANDOR_CameraInfo::ANDOR_CameraInfo():
 
                 /*  ANDOR SDK STRING AND ENUMERATED FEATURE CLASSES IMPLEMENTATION  */
 
-ANDOR_StringFeature::ANDOR_StringFeature(): std::wstring()
+ANDOR_StringFeature::ANDOR_StringFeature(): andor_string_t()
 {
 }
 
 ANDOR_StringFeature::ANDOR_StringFeature(ANDOR_Camera::ANDOR_Feature &feature):
-    std::wstring(feature.operator std::wstring())
+    andor_string_t(feature.operator andor_string_t())
 {
 
 }
@@ -179,14 +459,14 @@ ANDOR_StringFeature::ANDOR_StringFeature(ANDOR_Camera::ANDOR_Feature &feature):
 
 
 ANDOR_EnumFeature::ANDOR_EnumFeature():
-    std::wstring(), _index(-1)
+    andor_string_t(), _index(-1)
 {
 
 }
 
 
 ANDOR_EnumFeature::ANDOR_EnumFeature(ANDOR_Camera::ANDOR_Feature &feature):
-    std::wstring(feature.operator std::wstring())
+    andor_string_t(feature.operator andor_string_t())
 {
     _index = feature.at_index;
 }

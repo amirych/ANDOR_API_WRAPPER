@@ -21,4 +21,7 @@ int main()
     ANDOR_EnumFeature ef1 = cam[L"AuxOutSourceTwo"];
 
 //    ANDOR_EnumFeature zz(s);
+
+    cam["AuxOutSourceTwo"] = s;
+
 }

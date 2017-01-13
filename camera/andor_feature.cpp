@@ -12,10 +12,10 @@
 #include <codecvt>
 
 
-static std::wstring trim_str(const std::wstring &str)
+static andor_string_t trim_str(const andor_string_t &str)
 {
     size_t first = str.find_first_not_of(' ');
-    if ( first == std::string::npos ) return std::wstring();
+    if ( first == std::string::npos ) return andor_string_t();
 
     size_t last = str.find_last_not_of(' ');
 
@@ -24,14 +24,14 @@ static std::wstring trim_str(const std::wstring &str)
 
 
 ANDOR_Camera::ANDOR_Feature::ANDOR_Feature():
-    deviceHndl(AT_HANDLE_SYSTEM), featureName(nullptr), featureNameStr(std::wstring()),
-    featureType(UnknownType), logMessageStream()
+    deviceHndl(AT_HANDLE_SYSTEM), featureName(nullptr), featureNameStr(andor_string_t()),
+    featureType(UnknownType), logMessageStream(), at_string()
 {
 
 }
 
 
-ANDOR_Camera::ANDOR_Feature::ANDOR_Feature(const AT_H device_hndl, const std::wstring &name):
+ANDOR_Camera::ANDOR_Feature::ANDOR_Feature(const AT_H device_hndl, const andor_string_t &name):
     ANDOR_Feature()
 {
     setDeviceHndl(device_hndl);
@@ -39,27 +39,27 @@ ANDOR_Camera::ANDOR_Feature::ANDOR_Feature(const AT_H device_hndl, const std::ws
 }
 
 
-ANDOR_Camera::ANDOR_Feature::ANDOR_Feature(const AT_H device_hndl, const wchar_t *name):
-    ANDOR_Feature(device_hndl,std::wstring(name))
+ANDOR_Camera::ANDOR_Feature::ANDOR_Feature(const AT_H device_hndl, const AT_WC *name):
+    ANDOR_Feature(device_hndl,andor_string_t(name))
 {
 
 }
 
 
-ANDOR_Camera::ANDOR_Feature::ANDOR_Feature(const std::wstring &name):
+ANDOR_Camera::ANDOR_Feature::ANDOR_Feature(const andor_string_t &name):
     ANDOR_Feature(AT_HANDLE_SYSTEM, name)
 {
 
 }
 
 
-ANDOR_Camera::ANDOR_Feature::ANDOR_Feature(const wchar_t *name):
-    ANDOR_Feature(std::wstring(name))
+ANDOR_Camera::ANDOR_Feature::ANDOR_Feature(const AT_WC *name):
+    ANDOR_Feature(andor_string_t(name))
 {
 
 }
 
-void ANDOR_Camera::ANDOR_Feature::setName(const std::wstring &name)
+void ANDOR_Camera::ANDOR_Feature::setName(const andor_string_t &name)
 {
 //    if ( trim_str(name).empty() ) { // !!!!! TO DO: throw an exception!!
 //        return;
@@ -72,9 +72,9 @@ void ANDOR_Camera::ANDOR_Feature::setName(const std::wstring &name)
 }
 
 
-void ANDOR_Camera::ANDOR_Feature::setName(const wchar_t *name)
+void ANDOR_Camera::ANDOR_Feature::setName(const AT_WC *name)
 {
-    setName(std::wstring(name));
+    setName(andor_string_t(name));
 }
 
 
@@ -100,6 +100,13 @@ ANDOR_Camera::AndorFeatureType ANDOR_Camera::ANDOR_Feature::getType() const
 {
     return featureType;
 }
+
+
+std::string ANDOR_Camera::ANDOR_Feature::getLastLogMessage() const
+{
+    return logMessageStream.str();
+}
+
 
 
 ANDOR_Camera::ANDOR_Feature::operator ANDOR_StringFeature()
@@ -138,7 +145,7 @@ ANDOR_Camera::ANDOR_Feature::operator ANDOR_EnumFeature()
                         /*  'get value' methods  */
 
 
-ANDOR_Camera::ANDOR_Feature::operator std::wstring()
+ANDOR_Camera::ANDOR_Feature::operator andor_string_t()
 {
     switch ( featureType ) {
         case ANDOR_Camera::StringType:
@@ -299,7 +306,7 @@ void ANDOR_Camera::ANDOR_Feature::setBool(const bool val)
 }
 
 
-void ANDOR_Camera::ANDOR_Feature::setString(const std::wstring &val)
+void ANDOR_Camera::ANDOR_Feature::setString(const andor_string_t &val)
 {
     if ( featureType != ANDOR_Camera::StringType ) {
         throw AndorSDK_Exception(AT_ERR_NOTIMPLEMENTED,"Feature type missmatch!");
@@ -312,14 +319,14 @@ void ANDOR_Camera::ANDOR_Feature::setString(const std::wstring &val)
     at_string = val;
 }
 
-void ANDOR_Camera::ANDOR_Feature::setString(const wchar_t *val)
+void ANDOR_Camera::ANDOR_Feature::setString(const AT_WC *val)
 {
-    setString(std::wstring(val));
+    setString(andor_string_t(val));
 }
 
 
 
-void ANDOR_Camera::ANDOR_Feature::setEnumString(const std::wstring &val)
+void ANDOR_Camera::ANDOR_Feature::setEnumString(const andor_string_t &val)
 {
     if ( featureType != ANDOR_Camera::EnumType ) {
         throw AndorSDK_Exception(AT_ERR_NOTIMPLEMENTED,"Feature type missmatch!");
@@ -332,9 +339,9 @@ void ANDOR_Camera::ANDOR_Feature::setEnumString(const std::wstring &val)
     at_string = val;
 }
 
-void ANDOR_Camera::ANDOR_Feature::setEnumString(const wchar_t *val)
+void ANDOR_Camera::ANDOR_Feature::setEnumString(const AT_WC *val)
 {
-    setEnumString(std::wstring(val));
+    setEnumString(andor_string_t(val));
 }
 
 
@@ -376,7 +383,7 @@ ANDOR_Camera::ANDOR_Feature & ANDOR_Camera::ANDOR_Feature::operator = (const AND
 }
 
 
-ANDOR_Camera::ANDOR_Feature & ANDOR_Camera::ANDOR_Feature::operator = (const wchar_t* val)
+ANDOR_Camera::ANDOR_Feature & ANDOR_Camera::ANDOR_Feature::operator = (const AT_WC* val)
 {
     switch ( featureType ) {
         case ANDOR_Camera::StringType:
@@ -389,7 +396,7 @@ ANDOR_Camera::ANDOR_Feature & ANDOR_Camera::ANDOR_Feature::operator = (const wch
 
 }
 
-ANDOR_Camera::ANDOR_Feature & ANDOR_Camera::ANDOR_Feature::operator = (const std::wstring &val)
+ANDOR_Camera::ANDOR_Feature & ANDOR_Camera::ANDOR_Feature::operator = (const andor_string_t &val)
 {
     return operator = (val.c_str());
 }
@@ -405,6 +412,7 @@ void ANDOR_Camera::ANDOR_Feature::formatLogMessage(const std::string &sdk_func, 
     logHelper(deviceHndl);     // print device handler
     logHelper(args ...);       // print function arguments
     logMessageStream << ")";
+
 }
 
 
@@ -439,14 +447,14 @@ void ANDOR_Camera::ANDOR_Feature::logHelper(const char *str)
     logHelper(std::string(str));
 }
 
-void ANDOR_Camera::ANDOR_Feature::logHelper(const std::wstring &wstr)
+void ANDOR_Camera::ANDOR_Feature::logHelper(const andor_string_t &wstr)
 {
-    std::wstring_convert<std::codecvt_utf8<wchar_t>> str;
+    std::wstring_convert<std::codecvt_utf8<AT_WC>> str;
     logMessageStream << "'" << str.to_bytes(wstr) << "'";
 }
 
-void ANDOR_Camera::ANDOR_Feature::logHelper(const wchar_t *wstr)
+void ANDOR_Camera::ANDOR_Feature::logHelper(const AT_WC *wstr)
 {
-    logHelper(std::wstring(wstr));
+    logHelper(andor_string_t(wstr));
 }
 
