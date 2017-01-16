@@ -8,7 +8,9 @@
 
 #include <string>
 #include <list>
+#include <vector>
 #include <map>
+#include <utility>
 #include <iostream>
 #include <sstream>
 #include <functional>
@@ -18,7 +20,7 @@
 // actually, AT_WC is wchar_t according to declaration in atcore.h
 // to follow strategy of generalized SDK wrapper (in sence of hidding actuall data-types used in
 // SDK functions) one should declarate a string type to work with name of SDK feature and
-// representation of string- and enumated-type values
+// representation of string- and enumerated-type values
 
 typedef std::basic_string<AT_WC> andor_string_t;
 
@@ -32,6 +34,7 @@ const int ANDOR_SDK_ENUM_FEATURE_STRLEN = 30; // maximal length of string for en
 class ANDOR_CameraInfo;      // just forward declaration
 class ANDOR_StringFeature;
 class ANDOR_EnumFeature;
+class ANDOR_EnumFeatureInfo;
 
 
                     /************************************/
@@ -42,6 +45,7 @@ class ANDOR_API_WRAPPER_EXPORT ANDOR_Camera
 {
     friend class ANDOR_StringFeature;
     friend class ANDOR_EnumFeature;
+    friend class ANDOR_EnumFeatureInfo;
 
 public:
     enum LOG_IDENTIFICATOR {CAMERA_INFO, SDK_ERROR, CAMERA_ERROR, BLANK};
@@ -62,6 +66,7 @@ protected:
     class ANDOR_Feature {
         friend class ANDOR_StringFeature;
         friend class ANDOR_EnumFeature;
+        friend class ANDOR_EnumFeatureInfo;
     public:
         ANDOR_Feature();
         ANDOR_Feature(const AT_H device_hndl, const andor_string_t &name = andor_string_t());
@@ -91,7 +96,8 @@ protected:
         template<typename T, typename = typename std::enable_if<std::is_arithmetic<T>::value>::type>
         operator T()
         {
-            static T ret_val;
+//            static T ret_val;
+            T ret_val;
             switch ( featureType ) {
                 case ANDOR_Camera::IntType: {
                     getInt();
@@ -119,6 +125,41 @@ protected:
 
         explicit operator ANDOR_StringFeature();
         explicit operator ANDOR_EnumFeature();
+
+
+                 // get range of numeric feature and list of enumarated feature values
+
+        template<typename T, typename = typename std::enable_if<std::is_arithmetic<T>::value>::type>
+        operator std::pair<T,T>()
+        {
+//            static std::pair<T,T> ret_val;
+            std::pair<T,T> ret_val;
+
+            switch ( featureType ) {
+                case ANDOR_Camera::IntType: {
+                    std::pair<AT_64,AT_64> v = getIntMinMax();
+                    ret_val.first = T(v.first);
+                    ret_val.second = T(v.second);
+                }
+                case ANDOR_Camera::FloatType: {
+                    std::pair<double,double> v = getFloatMinMax();
+                    ret_val.first = T(v.first);
+                    ret_val.second = T(v.second);
+                }
+                case ANDOR_Camera::BoolType: {
+                    std::pair<bool,bool> v(false,true);
+                    ret_val.first = T(v.first);
+                    ret_val.second = T(v.second);
+                }
+                default: {
+                    throw AndorSDK_Exception(AT_ERR_INDEXNOTIMPLEMENTED,"Invalid feature type to get a range of its value!");
+                }
+            }
+
+            return ret_val;
+        }
+
+        explicit operator ANDOR_EnumFeatureInfo();
 
 
                  // set feature value operators
@@ -183,6 +224,9 @@ protected:
         void setEnumString(const wchar_t *val);
         void setEnumString(const andor_string_t &val);
         void setEnumIndex(const andor_enum_index_t val);
+
+        std::pair<AT_64,AT_64> getIntMinMax();
+        std::pair<double,double> getFloatMinMax();
 
         void getInt();
         void getFloat();
@@ -308,6 +352,33 @@ struct ANDOR_API_WRAPPER_EXPORT ANDOR_EnumFeature: public andor_string_t
 
 private:
     andor_enum_index_t _index;
+};
+
+
+
+class ANDOR_API_WRAPPER_EXPORT ANDOR_EnumFeatureInfo
+{
+    friend class ANDOR_Camera::ANDOR_Feature;
+
+    std::vector<andor_string_t> valueList;
+    std::vector<andor_enum_index_t> availableIndex;
+    std::vector<andor_enum_index_t> implementedIndex;
+
+public:
+    ANDOR_EnumFeatureInfo();
+    ANDOR_EnumFeatureInfo(const ANDOR_EnumFeatureInfo &other);
+    ANDOR_EnumFeatureInfo(ANDOR_EnumFeatureInfo &&other);
+    ANDOR_EnumFeatureInfo(const ANDOR_Camera::ANDOR_Feature &feature);
+
+    ANDOR_EnumFeatureInfo & operator=(const ANDOR_EnumFeatureInfo &other);
+    ANDOR_EnumFeatureInfo & operator=(ANDOR_EnumFeatureInfo &&other);
+
+    std::vector<andor_string_t> getValues() const;
+    std::vector<andor_string_t> getAvailableValues();
+    std::vector<andor_string_t> getImplementedValues();
+
+    std::vector<andor_enum_index_t> getAvailableIndices() const;
+    std::vector<andor_enum_index_t> getImplementedIndices() const;
 };
 
 

@@ -259,6 +259,89 @@ void ANDOR_Camera::ANDOR_Feature::getEnumString()
 }
 
 
+                                /*  'get range' methods  */
+
+std::pair<AT_64,AT_64> ANDOR_Camera::ANDOR_Feature::getIntMinMax()
+{
+    if ( featureType != ANDOR_Camera::IntType ) {
+        throw AndorSDK_Exception(AT_ERR_NOTIMPLEMENTED,"Feature type missmatch!");
+    }
+
+    std::pair<AT_64,AT_64> val(0,0);
+
+    formatLogMessage("AT_GetIntMin","&min_val");
+    andor_sdk_assert( AT_GetIntMin(deviceHndl,featureName,&val.first), logMessageStream.str());
+
+    formatLogMessage("AT_GetIntMax","&max_val");
+    andor_sdk_assert( AT_GetIntMax(deviceHndl,featureName,&val.second), logMessageStream.str());
+
+    return val;
+}
+
+
+std::pair<double,double> ANDOR_Camera::ANDOR_Feature::getFloatMinMax()
+{
+    if ( featureType != ANDOR_Camera::FloatType ) {
+        throw AndorSDK_Exception(AT_ERR_NOTIMPLEMENTED,"Feature type missmatch!");
+    }
+
+    std::pair<double,double> val(0,0);
+
+    formatLogMessage("AT_GetFloatMin","&min_val");
+    andor_sdk_assert( AT_GetFloatMin(deviceHndl,featureName,&val.first), logMessageStream.str());
+
+    formatLogMessage("AT_GetFloatMax","&max_val");
+    andor_sdk_assert( AT_GetFloatMax(deviceHndl,featureName,&val.second), logMessageStream.str());
+
+    return val;
+}
+
+
+ANDOR_Camera::ANDOR_Feature::operator ANDOR_EnumFeatureInfo()
+{
+    if ( featureType != ANDOR_Camera::EnumType ) {
+        throw AndorSDK_Exception(AT_ERR_NOTIMPLEMENTED,"Feature type missmatch!");
+    }
+
+    ANDOR_EnumFeatureInfo info;
+
+    int count;
+    AT_WC str[ANDOR_SDK_ENUM_FEATURE_STRLEN];
+    AT_BOOL flag;
+
+    formatLogMessage("AT_GetEnumCount","&count");
+    andor_sdk_assert( AT_GetEnumCount(deviceHndl, featureName, &count), logMessageStream.str() );
+
+    for ( int i = 0; i < count; ++i ) {
+        formatLogMessage("AT_GetEnumStringByIndex",i,"str",ANDOR_SDK_ENUM_FEATURE_STRLEN);
+
+        andor_sdk_assert( AT_GetEnumStringByIndex(deviceHndl,featureName,i,str,ANDOR_SDK_ENUM_FEATURE_STRLEN),
+                          logMessageStream.str());
+
+        info.valueList.push_back(str);
+
+        formatLogMessage("AT_IsEnumIndexImplemented",i,"&flag");
+
+        andor_sdk_assert( AT_IsEnumIndexImplemented(deviceHndl,featureName,i,&flag),
+                          logMessageStream.str());
+
+        if ( flag ) { // if it is not implemented then it is not available too
+            info.implementedIndex.push_back(i);
+
+            formatLogMessage("AT_IsEnumIndexAvailable",i,"&flag");
+
+            andor_sdk_assert( AT_IsEnumIndexAvailable(deviceHndl,featureName,i,&flag),
+                              logMessageStream.str());
+
+            if ( flag ) info.availableIndex.push_back(i);
+        }
+
+    }
+
+    return info;
+}
+
+
 
                                 /*  'set value' methods  */
 
@@ -458,3 +541,127 @@ void ANDOR_Camera::ANDOR_Feature::logHelper(const AT_WC *wstr)
     logHelper(andor_string_t(wstr));
 }
 
+
+
+                    /*  ANDOR SDK STRING AND ENUMERATED FEATURE CLASSES IMPLEMENTATION  */
+
+ANDOR_StringFeature::ANDOR_StringFeature(): andor_string_t()
+{
+}
+
+ANDOR_StringFeature::ANDOR_StringFeature(ANDOR_Camera::ANDOR_Feature &feature):
+    andor_string_t(feature.operator andor_string_t())
+{
+
+}
+
+
+
+
+
+ANDOR_EnumFeature::ANDOR_EnumFeature():
+    andor_string_t(), _index(-1)
+{
+
+}
+
+
+ANDOR_EnumFeature::ANDOR_EnumFeature(ANDOR_Camera::ANDOR_Feature &feature):
+    andor_string_t(feature.operator andor_string_t())
+{
+    _index = feature.at_index;
+}
+
+
+
+            /*  ANDOR SDK ENUMERATED FEATURE INFO CLASS IMPLEMENTATION  */
+
+ANDOR_EnumFeatureInfo::ANDOR_EnumFeatureInfo():
+    valueList(), availableIndex(), implementedIndex()
+{
+}
+
+
+ANDOR_EnumFeatureInfo::ANDOR_EnumFeatureInfo(const ANDOR_EnumFeatureInfo &other):
+    valueList(other.valueList), availableIndex(other.availableIndex), implementedIndex(other.implementedIndex)
+{
+
+}
+
+
+ANDOR_EnumFeatureInfo::ANDOR_EnumFeatureInfo(ANDOR_EnumFeatureInfo &&other):
+    ANDOR_EnumFeatureInfo()
+{
+    std::swap(valueList,other.valueList);
+    std::swap(availableIndex,other.availableIndex);
+    std::swap(implementedIndex,other.implementedIndex);
+}
+
+
+ANDOR_EnumFeatureInfo & ANDOR_EnumFeatureInfo::operator =(const ANDOR_EnumFeatureInfo &other)
+{
+    valueList = other.valueList;
+    availableIndex = other.availableIndex;
+    implementedIndex = other.implementedIndex;
+
+    return *this;
+}
+
+
+ANDOR_EnumFeatureInfo & ANDOR_EnumFeatureInfo::operator =(ANDOR_EnumFeatureInfo &&other)
+{
+    std::swap(valueList,other.valueList);
+    std::swap(availableIndex,other.availableIndex);
+    std::swap(implementedIndex,other.implementedIndex);
+
+    return *this;
+}
+
+
+ANDOR_EnumFeatureInfo::ANDOR_EnumFeatureInfo(const ANDOR_Camera::ANDOR_Feature &feature):
+    ANDOR_EnumFeatureInfo()
+{
+    *this = feature;
+}
+
+
+std::vector<andor_string_t> ANDOR_EnumFeatureInfo::getValues() const
+{
+    return valueList;
+}
+
+
+std::vector<andor_string_t> ANDOR_EnumFeatureInfo::getAvailableValues()
+{
+    std::vector<andor_string_t> vals;
+
+    for ( size_t i = 0; i < availableIndex.size(); ++i ) {
+        vals.push_back(valueList[i]);
+    }
+
+    return vals;
+}
+
+
+std::vector<andor_string_t> ANDOR_EnumFeatureInfo::getImplementedValues()
+{
+    std::vector<andor_string_t> vals;
+
+    for ( size_t i = 0; i < implementedIndex.size(); ++i ) {
+        vals.push_back(valueList[i]);
+    }
+
+    return vals;
+}
+
+
+std::vector<andor_enum_index_t> ANDOR_EnumFeatureInfo::getAvailableIndices() const
+{
+    return availableIndex;
+}
+
+
+std::vector<andor_enum_index_t> ANDOR_EnumFeatureInfo::getImplementedIndices() const
+{
+    return implementedIndex;
+}

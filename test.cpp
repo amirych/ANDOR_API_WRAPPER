@@ -24,4 +24,8 @@ int main()
 
     cam["AuxOutSourceTwo"] = s;
 
+    std::pair<int,int> vv = cam["AuxOutSourceTwo"];
+
+    ANDOR_EnumFeatureInfo eeff = cam["AuxOutSourceTwo"];
+    eeff = cam[L"SSSSS"];
 }

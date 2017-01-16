@@ -17,7 +17,7 @@ extern ANDOR_Camera::AndorFeatureNameMap  DEFAULT_ANDOR_SDK_FEATURES; // pre-def
 
                 /*  AUXILIARY NON-MEMBER FUNCTIONS  */
 
-std::string time_stamp()
+static std::string time_stamp()
 {
     auto now = std::chrono::system_clock::now();
     auto now_c = std::chrono::system_clock::to_time_t(now);
@@ -84,6 +84,9 @@ ANDOR_Camera::ANDOR_Camera():
     sf = (*this)[L"SSSS"];
 
     std::wcout << sf;
+
+    std::pair<int,int> vv;
+    vv = (*this)["AuxOutSourceTwo"];
 
 }
 
@@ -390,9 +393,11 @@ void ANDOR_Camera::logToFile(const LOG_IDENTIFICATOR ident, const std::string &l
     }
 
     std::string tab;
-    tab.resize(ANDOR_CAMERA_LOG_IDENTATION*identation,' ');
+    if ( identation > 0 ) {
+        tab.resize(ANDOR_CAMERA_LOG_IDENTATION*identation,' ');
+    }
 
-    str << tab << log_str;
+    str << " " << tab << log_str;
 
     *cameraLog << str.str() << std::flush;
 }
@@ -419,7 +424,7 @@ void ANDOR_Camera::logToFile(const ANDOR_Feature &feature, const int identation)
 }
 
 
-// print logging message obly if logLevel is verbose!!!
+// print logging message only if logLevel is verbose!!!
 void ANDOR_Camera::loggingFuncCallback(const std::string &log_str)
 {
     if ( logLevel == ANDOR_Camera::LOG_LEVEL_VERBOSE ) logToFile(ANDOR_Camera::CAMERA_INFO, log_str);
@@ -440,35 +445,5 @@ ANDOR_CameraInfo::ANDOR_CameraInfo():
 {
 }
 
-
-
-                /*  ANDOR SDK STRING AND ENUMERATED FEATURE CLASSES IMPLEMENTATION  */
-
-ANDOR_StringFeature::ANDOR_StringFeature(): andor_string_t()
-{
-}
-
-ANDOR_StringFeature::ANDOR_StringFeature(ANDOR_Camera::ANDOR_Feature &feature):
-    andor_string_t(feature.operator andor_string_t())
-{
-
-}
-
-
-
-
-
-ANDOR_EnumFeature::ANDOR_EnumFeature():
-    andor_string_t(), _index(-1)
-{
-
-}
-
-
-ANDOR_EnumFeature::ANDOR_EnumFeature(ANDOR_Camera::ANDOR_Feature &feature):
-    andor_string_t(feature.operator andor_string_t())
-{
-    _index = feature.at_index;
-}
 
 
