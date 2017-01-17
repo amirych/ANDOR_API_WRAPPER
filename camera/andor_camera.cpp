@@ -75,6 +75,9 @@ ANDOR_Camera::ANDOR_Camera():
         scanConnectedCameras();
     }
 
+    setLogLevel(logLevel); // needed to initialize or disable extra logging facility
+
+
     ANDOR_StringFeature sf,sf1;
 
     sf1 = (*this)[L"SSS"] = sf = L"EEEE";
@@ -102,6 +105,37 @@ ANDOR_Camera::~ANDOR_Camera()
 
 void ANDOR_Camera::setLogLevel(const LOG_LEVEL level)
 {
+    if ( logLevel == LOG_LEVEL_VERBOSE ) { // set extra logging function (logging from SDK function calling)
+        log_func_t log_f = std::bind(&ANDOR_Camera::printLog, this, std::placeholders::_1);
+        cameraFeature.setLoggingFunc(log_f);
+        CameraPresent.setLoggingFunc(log_f);
+        CameraAcquiring.setLoggingFunc(log_f);
+    } else { // reset logging function to null (no logging from camera features)
+        cameraFeature.setLoggingFunc();
+        CameraPresent.setLoggingFunc();
+        CameraAcquiring.setLoggingFunc();
+    }
+
+    std::string log_str = "Set logging level to ";
+
+    switch ( logLevel ) {
+        case LOG_LEVEL_VERBOSE:
+            log_str += "'VERBOSE'";
+            break;
+        case LOG_LEVEL_ERROR:
+            log_str += "'ERROR'";
+            break;
+        case LOG_LEVEL_QUIET:
+            log_str += "'QUIET'";
+            break;
+        default:
+            log_str += "'UNKNOWN'";
+            break;
+    }
+    log_str += " state!";
+
+    if ( logLevel == LOG_LEVEL_VERBOSE ) logToFile(CAMERA_INFO,log_str);
+
     logLevel = level;
 }
 
@@ -150,6 +184,7 @@ bool ANDOR_Camera::connectToCamera(const int device_index, std::ostream *log_fil
         logToFile(ANDOR_Camera::CAMERA_INFO,log_str,1);
 
         log_str = "AT_Open(" + std::to_string(device_index) + ", &cameraHndl)";
+        if ( logLevel == LOG_LEVEL_VERBOSE ) logToFile(CAMERA_INFO,log_str);
         andor_sdk_assert( AT_Open(device_index,&cameraHndl), log_str);
 
         CameraPresent.setDeviceHndl(cameraHndl);
@@ -174,7 +209,9 @@ bool ANDOR_Camera::connectToCamera(const int device_index, std::ostream *log_fil
 
         logToFile(ANDOR_Camera::CAMERA_INFO, "The callback function was registered successfully!");
 
+
         return true;
+
     } catch ( AndorSDK_Exception &ex) {
         logToFile(ex);
         lastError = ex.getError();
@@ -246,20 +283,43 @@ bool ANDOR_Camera::connectToCamera(const ANDOR_Camera::CAMERA_IDENT_TAG ident_ta
 }
 
 
-void ANDOR_Camera::disconnectFromCamera()
+void ANDOR_Camera::disconnectFromCamera() // here there is no SDK error processing!!!
 {
-    logToFile(ANDOR_Camera::CAMERA_INFO, "Try to disconnect from camera");
+    std::string log_str;
+
+    logToFile(ANDOR_Camera::CAMERA_INFO, "Try to disconnect from camera ...");
 
     if ( CameraAcquiring ) {
 
     }
 
     logToFile(ANDOR_Camera::CAMERA_INFO, "Unregistering 'CameraPresent'-feature callback function",1);
+
+    if ( logLevel == LOG_LEVEL_VERBOSE ) {
+        log_str = "AT_UnregisterFeatureCallback(" + std::to_string(cameraHndl) + ", L'CameraPresent', " +
+                  std::to_string((FeatureCallback)disconnection_callback) + ", nullptr)";
+        logToFile(ANDOR_Camera::CAMERA_INFO,log_str);
+    }
+
     AT_UnregisterFeatureCallback(cameraHndl,L"CameraPresent",(FeatureCallback)disconnection_callback,nullptr);
+
+
+    if ( logLevel == LOG_LEVEL_VERBOSE ) {
+        log_str = "AT_Close(" + std::to_string(cameraHndl) + ")";
+        logToFile(ANDOR_Camera::CAMERA_INFO,log_str);
+    }
 
     AT_Close(cameraHndl);
 
     logToFile(ANDOR_Camera::CAMERA_INFO,"Camera disconnected");
+}
+
+
+// print user logging message. It is formatted as CAMERA_INFO prefix-type string!
+// Note, a time stamp will be automatically added by the method 'logToFile'!
+void ANDOR_Camera::printLog(const std::string &log_str)
+{
+    logToFile(ANDOR_Camera::CAMERA_INFO, log_str);
 }
 
 
@@ -424,11 +484,6 @@ void ANDOR_Camera::logToFile(const ANDOR_Feature &feature, const int identation)
 }
 
 
-// print logging message only if logLevel is verbose!!!
-void ANDOR_Camera::loggingFuncCallback(const std::string &log_str)
-{
-    if ( logLevel == ANDOR_Camera::LOG_LEVEL_VERBOSE ) logToFile(ANDOR_Camera::CAMERA_INFO, log_str);
-}
 
 
                             /*  STATIC PUBLIC METHODS  */

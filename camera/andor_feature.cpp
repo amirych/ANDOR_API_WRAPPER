@@ -25,7 +25,7 @@ static andor_string_t trim_str(const andor_string_t &str)
 
 ANDOR_Camera::ANDOR_Feature::ANDOR_Feature():
     deviceHndl(AT_HANDLE_SYSTEM), featureName(nullptr), featureNameStr(andor_string_t()),
-    featureType(UnknownType), logMessageStream(), at_string()
+    featureType(UnknownType), logMessageStream(), loggingFunc(nullptr), at_string()
 {
 
 }
@@ -81,6 +81,12 @@ void ANDOR_Camera::ANDOR_Feature::setName(const AT_WC *name)
 void ANDOR_Camera::ANDOR_Feature::setDeviceHndl(const AT_H hndl)
 {
     deviceHndl = hndl;
+}
+
+
+void ANDOR_Camera::ANDOR_Feature::setLoggingFunc(const log_func_t &func)
+{
+    loggingFunc = func;
 }
 
 
@@ -496,6 +502,7 @@ void ANDOR_Camera::ANDOR_Feature::formatLogMessage(const std::string &sdk_func, 
     logHelper(args ...);       // print function arguments
     logMessageStream << ")";
 
+    if ( loggingFunc ) loggingFunc(logMessageStream.str()); // call user logging function
 }
 
 

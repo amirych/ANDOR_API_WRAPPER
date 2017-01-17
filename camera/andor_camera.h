@@ -15,7 +15,6 @@
 #include <sstream>
 #include <functional>
 
-//using namespace std;
 
 // actually, AT_WC is wchar_t according to declaration in atcore.h
 // to follow strategy of generalized SDK wrapper (in sence of hidding actuall data-types used in
@@ -61,6 +60,8 @@ public:
 
 protected:
 
+    typedef std::function<void(const std::string &)> log_func_t; // function type for extra-logging facility
+
                 /*   DECLARATION OF A PROXY CLASS TO ACCESS ANDOR SDK FEATURES  */
 
     class ANDOR_Feature {
@@ -89,6 +90,8 @@ protected:
         AndorFeatureType getType() const;
 
         std::string getLastLogMessage() const;
+
+        void setLoggingFunc(const log_func_t &func = nullptr);
 
 
                  // get feature value operators
@@ -215,6 +218,8 @@ protected:
 
         std::stringstream logMessageStream;
 
+        log_func_t loggingFunc;
+
 
         void setInt(const AT_64 val);
         void setFloat(const double val);
@@ -269,6 +274,8 @@ public:
     bool connectToCamera(const ANDOR_Camera::CAMERA_IDENT_TAG ident_tag, const andor_string_t &tag_str, std::ostream *log_file);
     void disconnectFromCamera();
 
+    void printLog(const std::string &log_str); // user logging function (to be printed with CAMERA_INFO header-type)
+
 
             /* operator[] for accessing Andor SDK features (const and non-const versions) */
 
@@ -317,8 +324,6 @@ protected:
     static AndorFeatureNameMap ANDOR_SDK_FEATURES;
 
     static int scanConnectedCameras(); // scan connected cameras when the first object will be created
-
-    void loggingFuncCallback(const std::string &log_str);
 
 }; // end of ANDOR_Camera class declaration
 
