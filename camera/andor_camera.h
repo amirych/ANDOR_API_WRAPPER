@@ -14,6 +14,7 @@
 #include <iostream>
 #include <sstream>
 #include <functional>
+#include <thread>
 
 
 // actually, AT_WC is wchar_t according to declaration in atcore.h
@@ -55,12 +56,16 @@ public:
     typedef std::map<andor_string_t,AndorFeatureType> AndorFeatureNameMap;
 
     explicit ANDOR_Camera();
+
     virtual ~ANDOR_Camera();
 
 
 protected:
 
-    typedef std::function<void(const std::string &)> log_func_t; // function type for extra-logging facility
+    // function type for extra-logging facility
+    // signature is the same as ANDOR_Camera::logToFile (the first overloaded variant)
+
+    typedef std::function<void(const ANDOR_Camera::LOG_IDENTIFICATOR, const std::string &, const int)> log_func_t;
 
                 /*   DECLARATION OF A PROXY CLASS TO ACCESS ANDOR SDK FEATURES  */
 
@@ -76,7 +81,7 @@ protected:
         ANDOR_Feature(const andor_string_t &name);
         ANDOR_Feature(const AT_WC* name);
 
-        ANDOR_Feature(ANDOR_Feature && other); // move ctor
+//        ANDOR_Feature(ANDOR_Feature && other); // move ctor
 
 //        ~ANDOR_Feature();
 
@@ -91,6 +96,7 @@ protected:
 
         std::string getLastLogMessage() const;
 
+        // see declaration of 'log_func_t' type above
         void setLoggingFunc(const log_func_t &func = nullptr);
 
 
@@ -274,8 +280,6 @@ public:
     bool connectToCamera(const ANDOR_Camera::CAMERA_IDENT_TAG ident_tag, const andor_string_t &tag_str, std::ostream *log_file);
     void disconnectFromCamera();
 
-    void printLog(const std::string &log_str); // user logging function (to be printed with CAMERA_INFO header-type)
-
 
             /* operator[] for accessing Andor SDK features (const and non-const versions) */
 
@@ -297,6 +301,13 @@ public:
     ANDOR_Feature CameraAcquiring;
 
 
+           /*  logging methods */
+
+    void logToFile(const LOG_IDENTIFICATOR ident, const std::string &log_str, const int identation = 0); // general logging
+    void logToFile(const LOG_IDENTIFICATOR ident, const char *log_str, const int identation = 0); // general logging
+    void logToFile(const AndorSDK_Exception &ex, const int identation = 0); // SDK error logging
+
+
 protected:
     LOG_LEVEL logLevel;
 
@@ -309,11 +320,12 @@ protected:
 
     ANDOR_Feature cameraFeature;
 
-    void logToFile(const LOG_IDENTIFICATOR ident, const std::string &log_str, const int identation = 0); // general logging
-    void logToFile(const LOG_IDENTIFICATOR ident, const char *log_str, const int identation = 0); // general logging
-    void logToFile(const AndorSDK_Exception &ex, const int identation = 0); // SDK error logging
     void logToFile(const ANDOR_Feature &feature, const int identation = 0); // SDK function calling logging
 
+
+    std::thread waitBufferThread;
+
+    void waitBufferFunc();
 
                 /*  static class members and methods  */
 
@@ -335,7 +347,7 @@ protected:
 struct ANDOR_API_WRAPPER_EXPORT ANDOR_StringFeature: public andor_string_t
 {
     using andor_string_t::andor_string_t;
-    ANDOR_StringFeature();
+    explicit ANDOR_StringFeature();
     ANDOR_StringFeature(ANDOR_Camera::ANDOR_Feature &feature);
 };
 
@@ -349,8 +361,7 @@ struct ANDOR_API_WRAPPER_EXPORT ANDOR_EnumFeature: public andor_string_t
 
     using andor_string_t::andor_string_t;
 
-    ANDOR_EnumFeature(); // one must init _index member to some invalid value at this point! do not inherite
-                         // default ctor from wstring!
+    explicit ANDOR_EnumFeature();
     ANDOR_EnumFeature(ANDOR_Camera::ANDOR_Feature &feature);
 
     andor_enum_index_t index() const;
@@ -375,8 +386,7 @@ public:
     ANDOR_EnumFeatureInfo(ANDOR_EnumFeatureInfo &&other);
     ANDOR_EnumFeatureInfo(const ANDOR_Camera::ANDOR_Feature &feature);
 
-    ANDOR_EnumFeatureInfo & operator=(const ANDOR_EnumFeatureInfo &other);
-    ANDOR_EnumFeatureInfo & operator=(ANDOR_EnumFeatureInfo &&other);
+    ANDOR_EnumFeatureInfo &operator =(ANDOR_EnumFeatureInfo other);
 
     std::vector<andor_string_t> getValues() const;
     std::vector<andor_string_t> getAvailableValues();

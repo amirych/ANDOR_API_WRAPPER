@@ -64,7 +64,8 @@ ANDOR_Camera::ANDOR_Feature ANDOR_Camera::SoftwareVersion(AT_HANDLE_SYSTEM,L"Sof
 ANDOR_Camera::ANDOR_Camera():
     logLevel(LOG_LEVEL_ERROR),
     lastError(AT_SUCCESS), cameraLog(nullptr), cameraHndl(AT_HANDLE_SYSTEM),
-    CameraPresent(L"CameraPresent"), CameraAcquiring(L"CameraAcquiring"), cameraFeature()
+    CameraPresent(L"CameraPresent"), CameraAcquiring(L"CameraAcquiring"), cameraFeature(),
+    waitBufferThread()
 {
     // camera handler for "CameraPresent"
     // and "CameraAcquiring" features will be
@@ -77,6 +78,7 @@ ANDOR_Camera::ANDOR_Camera():
 
     setLogLevel(logLevel); // needed to initialize or disable extra logging facility
 
+    ++numberOfCreatedObjects;
 
     ANDOR_StringFeature sf,sf1;
 
@@ -91,12 +93,18 @@ ANDOR_Camera::ANDOR_Camera():
     std::pair<int,int> vv;
     vv = (*this)["AuxOutSourceTwo"];
 
+    logToFile((*this)["AuxOutSourceTwo"] = 10.33);
 }
 
 
 
 ANDOR_Camera::~ANDOR_Camera()
 {
+    --numberOfCreatedObjects;
+
+    if ( !numberOfCreatedObjects ) {
+        AT_FinaliseLibrary();
+    }
 }
 
 
@@ -106,11 +114,14 @@ ANDOR_Camera::~ANDOR_Camera()
 void ANDOR_Camera::setLogLevel(const LOG_LEVEL level)
 {
     if ( logLevel == LOG_LEVEL_VERBOSE ) { // set extra logging function (logging from SDK function calling)
-        log_func_t log_f = std::bind(&ANDOR_Camera::printLog, this, std::placeholders::_1);
-        cameraFeature.setLoggingFunc(log_f);
-        CameraPresent.setLoggingFunc(log_f);
-        CameraAcquiring.setLoggingFunc(log_f);
-    } else { // reset logging function to null (no logging from camera features)
+        log_func_t log_func = std::bind(
+           static_cast<void(ANDOR_Camera::*)(const ANDOR_Camera::LOG_IDENTIFICATOR, const std::string&, const int)>
+           (&ANDOR_Camera::logToFile), this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3
+                                    );
+        cameraFeature.setLoggingFunc(log_func);
+        CameraPresent.setLoggingFunc(log_func);
+        CameraAcquiring.setLoggingFunc(log_func);
+    } else { // reset logging function to null (no logging from SDK function calling)
         cameraFeature.setLoggingFunc();
         CameraPresent.setLoggingFunc();
         CameraAcquiring.setLoggingFunc();
@@ -185,6 +196,7 @@ bool ANDOR_Camera::connectToCamera(const int device_index, std::ostream *log_fil
 
         log_str = "AT_Open(" + std::to_string(device_index) + ", &cameraHndl)";
         if ( logLevel == LOG_LEVEL_VERBOSE ) logToFile(CAMERA_INFO,log_str);
+
         andor_sdk_assert( AT_Open(device_index,&cameraHndl), log_str);
 
         CameraPresent.setDeviceHndl(cameraHndl);
@@ -204,6 +216,8 @@ bool ANDOR_Camera::connectToCamera(const int device_index, std::ostream *log_fil
 
         log_str = "AT_RegisterFeatureCallback(" + std::to_string(cameraHndl) + ", L'CameraPresent', " +
                   "(FeatureCallback)disconnection_callback,(void*)this";
+        if ( logLevel == LOG_LEVEL_VERBOSE ) logToFile(CAMERA_INFO,log_str);
+
         andor_sdk_assert( AT_RegisterFeatureCallback(cameraHndl,L"CameraPresent",(FeatureCallback)disconnection_callback,(void*)this),
                           log_str);
 
@@ -297,7 +311,7 @@ void ANDOR_Camera::disconnectFromCamera() // here there is no SDK error processi
 
     if ( logLevel == LOG_LEVEL_VERBOSE ) {
         log_str = "AT_UnregisterFeatureCallback(" + std::to_string(cameraHndl) + ", L'CameraPresent', " +
-                  std::to_string((FeatureCallback)disconnection_callback) + ", nullptr)";
+                  "(FeatureCallback)disconnection_callback), nullptr)";
         logToFile(ANDOR_Camera::CAMERA_INFO,log_str);
     }
 
@@ -315,12 +329,66 @@ void ANDOR_Camera::disconnectFromCamera() // here there is no SDK error processi
 }
 
 
-// print user logging message. It is formatted as CAMERA_INFO prefix-type string!
-// Note, a time stamp will be automatically added by the method 'logToFile'!
-void ANDOR_Camera::printLog(const std::string &log_str)
+
+void ANDOR_Camera::logToFile(const LOG_IDENTIFICATOR ident, const std::string &log_str, const int identation)
 {
-    logToFile(ANDOR_Camera::CAMERA_INFO, log_str);
+    if ( !cameraLog ) return;
+    if ( logLevel == ANDOR_Camera::LOG_LEVEL_QUIET ) return;
+
+
+    std::stringstream str;
+
+    str << "[" << time_stamp() << "] ";
+
+    switch (ident) {
+    case ANDOR_Camera::CAMERA_INFO:
+        str << "[CAMERA INFO";
+        if ( cameraHndl != AT_HANDLE_SYSTEM ) { // camera already connected, add device handler identificator
+            str << ", DEVICE HANDLER " << cameraHndl << "]";
+        } else {
+            str << "]";
+        }
+        break;
+    case ANDOR_Camera::SDK_ERROR:
+        str << "[ANDOR SDK ERROR, DEVICE HANDLER " << cameraHndl << "]";
+        break;
+    case ANDOR_Camera::CAMERA_ERROR:
+        str << "[CAMERA ERROR";
+        if ( cameraHndl != AT_HANDLE_SYSTEM ) { // camera already connected, add device handler identificator
+            str << ", DEVICE HANDLER " << cameraHndl << "]";
+        } else {
+            str << "]";
+        }
+        break;
+    default: // just ignore
+        break;
+    }
+
+    std::string tab;
+    if ( identation > 0 ) {
+        tab.resize(ANDOR_CAMERA_LOG_IDENTATION*identation,' ');
+    }
+
+    str << " " << tab << log_str;
+
+    *cameraLog << str.str() << std::flush;
 }
+
+
+void ANDOR_Camera::logToFile(const LOG_IDENTIFICATOR ident, const char *log_str, const int identation)
+{
+    logToFile(ident,std::string(log_str),identation);
+}
+
+
+void ANDOR_Camera::logToFile(const AndorSDK_Exception &ex, const int identation)
+{
+    std::stringstream str;
+    str << ex.what() << " [ANDOR SDK ERROR CODE: " << ex.getError() << "]";
+
+    logToFile(ANDOR_Camera::SDK_ERROR, str.str(), identation);
+}
+
 
 
                     /*  PUBLIC OPERATORS[]  */
@@ -418,64 +486,6 @@ int ANDOR_Camera::scanConnectedCameras()
 }
 
 
-void ANDOR_Camera::logToFile(const LOG_IDENTIFICATOR ident, const std::string &log_str, const int identation)
-{
-    if ( !cameraLog ) return;
-    if ( logLevel == ANDOR_Camera::LOG_LEVEL_QUIET ) return;
-
-
-    std::stringstream str;
-
-    str << "[" << time_stamp() << "] ";
-
-    switch (ident) {
-    case ANDOR_Camera::CAMERA_INFO:
-        str << "[CAMERA INFO";
-        if ( cameraHndl != AT_HANDLE_SYSTEM ) { // camera already connected, add device handler identificator
-            str << ", DEVICE HANDLER " << cameraHndl << "]";
-        } else {
-            str << "]";
-        }
-        break;
-    case ANDOR_Camera::SDK_ERROR:
-        str << "[ANDOR SDK ERROR, DEVICE HANDLER " << cameraHndl << "]";
-        break;
-    case ANDOR_Camera::CAMERA_ERROR:
-        str << "[CAMERA ERROR";
-        if ( cameraHndl != AT_HANDLE_SYSTEM ) { // camera already connected, add device handler identificator
-            str << ", DEVICE HANDLER " << cameraHndl << "]";
-        } else {
-            str << "]";
-        }
-        break;
-    default: // just ignore
-        break;
-    }
-
-    std::string tab;
-    if ( identation > 0 ) {
-        tab.resize(ANDOR_CAMERA_LOG_IDENTATION*identation,' ');
-    }
-
-    str << " " << tab << log_str;
-
-    *cameraLog << str.str() << std::flush;
-}
-
-
-void ANDOR_Camera::logToFile(const LOG_IDENTIFICATOR ident, const char *log_str, const int identation)
-{
-    logToFile(ident,std::string(log_str),identation);
-}
-
-
-void ANDOR_Camera::logToFile(const AndorSDK_Exception &ex, const int identation)
-{
-    std::stringstream str;
-    str << ex.what() << " [ANDOR SDK ERROR CODE: " << ex.getError() << "]";
-
-    logToFile(ANDOR_Camera::SDK_ERROR, str.str(), identation);
-}
 
 
 void ANDOR_Camera::logToFile(const ANDOR_Feature &feature, const int identation)

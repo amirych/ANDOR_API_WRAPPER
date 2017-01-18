@@ -502,7 +502,7 @@ void ANDOR_Camera::ANDOR_Feature::formatLogMessage(const std::string &sdk_func, 
     logHelper(args ...);       // print function arguments
     logMessageStream << ")";
 
-    if ( loggingFunc ) loggingFunc(logMessageStream.str()); // call user logging function
+    if ( loggingFunc ) loggingFunc(ANDOR_Camera::CAMERA_INFO,logMessageStream.str(),0); // call user logging function
 }
 
 
@@ -605,24 +605,17 @@ ANDOR_EnumFeatureInfo::ANDOR_EnumFeatureInfo(ANDOR_EnumFeatureInfo &&other):
 }
 
 
-ANDOR_EnumFeatureInfo & ANDOR_EnumFeatureInfo::operator =(const ANDOR_EnumFeatureInfo &other)
+ANDOR_EnumFeatureInfo & ANDOR_EnumFeatureInfo::operator =(ANDOR_EnumFeatureInfo other)
 {
-    valueList = other.valueList;
-    availableIndex = other.availableIndex;
-    implementedIndex = other.implementedIndex;
+    if ( this == &other ) return *this;
 
-    return *this;
-}
-
-
-ANDOR_EnumFeatureInfo & ANDOR_EnumFeatureInfo::operator =(ANDOR_EnumFeatureInfo &&other)
-{
     std::swap(valueList,other.valueList);
     std::swap(availableIndex,other.availableIndex);
     std::swap(implementedIndex,other.implementedIndex);
 
     return *this;
 }
+
 
 
 ANDOR_EnumFeatureInfo::ANDOR_EnumFeatureInfo(const ANDOR_Camera::ANDOR_Feature &feature):
