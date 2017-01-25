@@ -79,21 +79,6 @@ ANDOR_Camera::ANDOR_Camera():
     setLogLevel(logLevel); // needed to initialize or disable extra logging facility
 
     ++numberOfCreatedObjects;
-
-    ANDOR_StringFeature sf,sf1;
-
-    sf1 = (*this)[L"SSS"] = sf = L"EEEE";
-    int ind = (*this)[L"SSS"] = sf = L"EEEE";
-
-    ANDOR_StringFeature ss = (*this)[L"SSSS"];
-    sf = (*this)[L"SSSS"];
-
-    std::wcout << sf;
-
-    std::pair<int,int> vv;
-    vv = (*this)["AuxOutSourceTwo"];
-
-    logToFile((*this)["AuxOutSourceTwo"] = 10.33);
 }
 
 

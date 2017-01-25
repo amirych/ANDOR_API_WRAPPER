@@ -16,6 +16,11 @@
 #include <functional>
 #include <thread>
 
+// for MS compilers: disable multiple warnings about DLL-exports for the STL containers
+// (and many others C++11 defined classes, e.g., thread)
+#ifdef _MSC_VER
+#pragma warning( disable: 4251 )
+#endif
 
 // actually, AT_WC is wchar_t according to declaration in atcore.h
 // to follow strategy of generalized SDK wrapper (in sence of hidding actuall data-types used in
@@ -31,9 +36,9 @@ typedef int andor_enum_index_t; // type for ANDOR SDK enumerated feature index
 const int ANDOR_SDK_ENUM_FEATURE_STRLEN = 30; // maximal length of string for enumerated feature
 
 
-class ANDOR_CameraInfo;      // just forward declaration
-class ANDOR_StringFeature;
-class ANDOR_EnumFeature;
+struct ANDOR_CameraInfo;      // just forward declaration
+struct ANDOR_StringFeature;
+struct ANDOR_EnumFeature;
 class ANDOR_EnumFeatureInfo;
 
 
@@ -43,8 +48,8 @@ class ANDOR_EnumFeatureInfo;
 
 class ANDOR_API_WRAPPER_EXPORT ANDOR_Camera
 {
-    friend class ANDOR_StringFeature;
-    friend class ANDOR_EnumFeature;
+    friend struct ANDOR_StringFeature;
+    friend struct ANDOR_EnumFeature;
     friend class ANDOR_EnumFeatureInfo;
 
 public:
@@ -70,8 +75,8 @@ protected:
                 /*   DECLARATION OF A PROXY CLASS TO ACCESS ANDOR SDK FEATURES  */
 
     class ANDOR_Feature {
-        friend class ANDOR_StringFeature;
-        friend class ANDOR_EnumFeature;
+        friend struct ANDOR_StringFeature;
+        friend struct ANDOR_EnumFeature;
         friend class ANDOR_EnumFeatureInfo;
     public:
         ANDOR_Feature();
@@ -81,7 +86,11 @@ protected:
         ANDOR_Feature(const andor_string_t &name);
         ANDOR_Feature(const AT_WC* name);
 
-//        ANDOR_Feature(ANDOR_Feature && other); // move ctor
+        ANDOR_Feature(ANDOR_Feature && other) = delete;
+        ANDOR_Feature(const ANDOR_Feature &other) = delete;
+
+        ANDOR_Feature & operator = (const ANDOR_Feature &other) = delete;
+        ANDOR_Feature & operator = (ANDOR_Feature other) = delete;
 
 //        ~ANDOR_Feature();
 
@@ -205,7 +214,7 @@ protected:
         ANDOR_Feature & operator = (const ANDOR_StringFeature &val);
         ANDOR_Feature & operator = (const ANDOR_EnumFeature &val);
         ANDOR_Feature &  operator = (const andor_string_t &val);
-        ANDOR_Feature &  operator = (const wchar_t *val);
+        ANDOR_Feature &  operator = (const AT_WC *val);
 
 
     private:
@@ -238,6 +247,7 @@ protected:
 
         std::pair<AT_64,AT_64> getIntMinMax();
         std::pair<double,double> getFloatMinMax();
+        std::vector<andor_string_t> getEnumInfo(std::vector<andor_enum_index_t> &imIdx, std::vector<andor_enum_index_t> &aIdx);
 
         void getInt();
         void getFloat();
@@ -384,9 +394,9 @@ public:
     ANDOR_EnumFeatureInfo();
     ANDOR_EnumFeatureInfo(const ANDOR_EnumFeatureInfo &other);
     ANDOR_EnumFeatureInfo(ANDOR_EnumFeatureInfo &&other);
-    ANDOR_EnumFeatureInfo(const ANDOR_Camera::ANDOR_Feature &feature);
+    ANDOR_EnumFeatureInfo(ANDOR_Camera::ANDOR_Feature &feature);
 
-    ANDOR_EnumFeatureInfo &operator =(ANDOR_EnumFeatureInfo other);
+    ANDOR_EnumFeatureInfo & operator =(ANDOR_EnumFeatureInfo other);
 
     std::vector<andor_string_t> getValues() const;
     std::vector<andor_string_t> getAvailableValues();

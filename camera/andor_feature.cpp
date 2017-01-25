@@ -303,6 +303,53 @@ std::pair<double,double> ANDOR_Camera::ANDOR_Feature::getFloatMinMax()
 }
 
 
+std::vector<andor_string_t> ANDOR_Camera::ANDOR_Feature::getEnumInfo(std::vector<andor_enum_index_t> &imIdx,
+                                                                     std::vector<andor_enum_index_t> &aIdx)
+{
+    int count;
+    AT_WC str[ANDOR_SDK_ENUM_FEATURE_STRLEN];
+    AT_BOOL flag;
+
+    std::vector<andor_string_t> vals;
+
+    formatLogMessage("AT_GetEnumCount","&count");
+    andor_sdk_assert( AT_GetEnumCount(deviceHndl, featureName, &count), logMessageStream.str() );
+
+    if ( !count ) return vals;
+
+    aIdx.clear();
+    imIdx.clear();
+
+    for ( int i = 0; i < count; ++i ) {
+        formatLogMessage("AT_GetEnumStringByIndex",i,"str",ANDOR_SDK_ENUM_FEATURE_STRLEN);
+
+        andor_sdk_assert( AT_GetEnumStringByIndex(deviceHndl,featureName,i,str,ANDOR_SDK_ENUM_FEATURE_STRLEN),
+                          logMessageStream.str());
+
+        vals.push_back(str);
+
+        formatLogMessage("AT_IsEnumIndexImplemented",i,"&flag");
+
+        andor_sdk_assert( AT_IsEnumIndexImplemented(deviceHndl,featureName,i,&flag),
+                          logMessageStream.str());
+
+        if ( flag ) { // if it is not implemented then it is not available too
+            imIdx.push_back(i);
+
+            formatLogMessage("AT_IsEnumIndexAvailable",i,"&flag");
+
+            andor_sdk_assert( AT_IsEnumIndexAvailable(deviceHndl,featureName,i,&flag),
+                              logMessageStream.str());
+
+            if ( flag ) aIdx.push_back(i);
+        }
+
+    }
+
+    return vals;
+}
+
+
 ANDOR_Camera::ANDOR_Feature::operator ANDOR_EnumFeatureInfo()
 {
     if ( featureType != ANDOR_Camera::EnumType ) {
@@ -311,38 +358,7 @@ ANDOR_Camera::ANDOR_Feature::operator ANDOR_EnumFeatureInfo()
 
     ANDOR_EnumFeatureInfo info;
 
-    int count;
-    AT_WC str[ANDOR_SDK_ENUM_FEATURE_STRLEN];
-    AT_BOOL flag;
-
-    formatLogMessage("AT_GetEnumCount","&count");
-    andor_sdk_assert( AT_GetEnumCount(deviceHndl, featureName, &count), logMessageStream.str() );
-
-    for ( int i = 0; i < count; ++i ) {
-        formatLogMessage("AT_GetEnumStringByIndex",i,"str",ANDOR_SDK_ENUM_FEATURE_STRLEN);
-
-        andor_sdk_assert( AT_GetEnumStringByIndex(deviceHndl,featureName,i,str,ANDOR_SDK_ENUM_FEATURE_STRLEN),
-                          logMessageStream.str());
-
-        info.valueList.push_back(str);
-
-        formatLogMessage("AT_IsEnumIndexImplemented",i,"&flag");
-
-        andor_sdk_assert( AT_IsEnumIndexImplemented(deviceHndl,featureName,i,&flag),
-                          logMessageStream.str());
-
-        if ( flag ) { // if it is not implemented then it is not available too
-            info.implementedIndex.push_back(i);
-
-            formatLogMessage("AT_IsEnumIndexAvailable",i,"&flag");
-
-            andor_sdk_assert( AT_IsEnumIndexAvailable(deviceHndl,featureName,i,&flag),
-                              logMessageStream.str());
-
-            if ( flag ) info.availableIndex.push_back(i);
-        }
-
-    }
+    info.valueList = getEnumInfo(info.implementedIndex, info.availableIndex);
 
     return info;
 }
@@ -618,10 +634,10 @@ ANDOR_EnumFeatureInfo & ANDOR_EnumFeatureInfo::operator =(ANDOR_EnumFeatureInfo 
 
 
 
-ANDOR_EnumFeatureInfo::ANDOR_EnumFeatureInfo(const ANDOR_Camera::ANDOR_Feature &feature):
+ANDOR_EnumFeatureInfo::ANDOR_EnumFeatureInfo(ANDOR_Camera::ANDOR_Feature &feature):
     ANDOR_EnumFeatureInfo()
 {
-    *this = feature;
+    valueList = feature.getEnumInfo(implementedIndex, availableIndex);
 }
 
 

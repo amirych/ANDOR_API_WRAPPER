@@ -28,4 +28,8 @@ int main()
 
     ANDOR_EnumFeatureInfo eeff = cam["AuxOutSourceTwo"];
     eeff = cam[L"SSSSS"];
+
+    ANDOR_StringFeature ss;
+
+    cam["AuxOutSourceTwo"] = ss = L"dedede";
 }
