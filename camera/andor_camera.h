@@ -390,6 +390,10 @@ class ANDOR_API_WRAPPER_EXPORT ANDOR_EnumFeatureInfo
     std::vector<andor_enum_index_t> availableIndex;
     std::vector<andor_enum_index_t> implementedIndex;
 
+    andor_enum_index_t currentIndex;
+
+    void swap(ANDOR_EnumFeatureInfo &v1, ANDOR_EnumFeatureInfo &v2);
+
 public:
     ANDOR_EnumFeatureInfo();
     ANDOR_EnumFeatureInfo(const ANDOR_EnumFeatureInfo &other);
@@ -404,6 +408,8 @@ public:
 
     std::vector<andor_enum_index_t> getAvailableIndices() const;
     std::vector<andor_enum_index_t> getImplementedIndices() const;
+
+    andor_enum_index_t index() const;
 };
 
 

@@ -32,4 +32,5 @@ int main()
     ANDOR_StringFeature ss;
 
     cam["AuxOutSourceTwo"] = ss = L"dedede";
+
 }

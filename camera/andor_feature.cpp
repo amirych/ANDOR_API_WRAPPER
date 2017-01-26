@@ -221,13 +221,21 @@ void ANDOR_Camera::ANDOR_Feature::getString()
     andor_sdk_assert( AT_GetStringMaxLength(deviceHndl,featureName,&len), logMessageStream.str());
 
     if ( len ) {
-        AT_WC str[len];
+        AT_WC* str;
+        try {
+//            AT_WC str[len]; // not allowed in VS, only GCC
+            str = new AT_WC[len];
+        } catch (std::bad_alloc &ex ) {
+            throw AndorSDK_Exception(AT_ERR_NOMEMORY, "Can not allocate memory for AT_WC* string!");
+        }
 
         formatLogMessage("AT_GetString","str",len);
 
         andor_sdk_assert( AT_GetString(deviceHndl,featureName,str,len), logMessageStream.str());
 
         at_string = str;
+
+        delete[] str;
     } else {
         throw AndorSDK_Exception(AT_ERR_NULL_MAXSTRINGLENGTH,"Length of string feature value is 0!");
     }
@@ -345,6 +353,8 @@ std::vector<andor_string_t> ANDOR_Camera::ANDOR_Feature::getEnumInfo(std::vector
         }
 
     }
+
+    getEnumIndex(); // get current index
 
     return vals;
 }
@@ -600,13 +610,14 @@ ANDOR_EnumFeature::ANDOR_EnumFeature(ANDOR_Camera::ANDOR_Feature &feature):
             /*  ANDOR SDK ENUMERATED FEATURE INFO CLASS IMPLEMENTATION  */
 
 ANDOR_EnumFeatureInfo::ANDOR_EnumFeatureInfo():
-    valueList(), availableIndex(), implementedIndex()
+    valueList(), availableIndex(), implementedIndex(), currentIndex(-1)
 {
 }
 
 
 ANDOR_EnumFeatureInfo::ANDOR_EnumFeatureInfo(const ANDOR_EnumFeatureInfo &other):
-    valueList(other.valueList), availableIndex(other.availableIndex), implementedIndex(other.implementedIndex)
+    valueList(other.valueList), availableIndex(other.availableIndex),
+    implementedIndex(other.implementedIndex), currentIndex(other.currentIndex)
 {
 
 }
@@ -615,9 +626,9 @@ ANDOR_EnumFeatureInfo::ANDOR_EnumFeatureInfo(const ANDOR_EnumFeatureInfo &other)
 ANDOR_EnumFeatureInfo::ANDOR_EnumFeatureInfo(ANDOR_EnumFeatureInfo &&other):
     ANDOR_EnumFeatureInfo()
 {
-    std::swap(valueList,other.valueList);
-    std::swap(availableIndex,other.availableIndex);
-    std::swap(implementedIndex,other.implementedIndex);
+    if ( this == &other ) return;
+
+    swap(*this, other);
 }
 
 
@@ -625,9 +636,7 @@ ANDOR_EnumFeatureInfo & ANDOR_EnumFeatureInfo::operator =(ANDOR_EnumFeatureInfo 
 {
     if ( this == &other ) return *this;
 
-    std::swap(valueList,other.valueList);
-    std::swap(availableIndex,other.availableIndex);
-    std::swap(implementedIndex,other.implementedIndex);
+    swap(*this, other);
 
     return *this;
 }
@@ -680,4 +689,20 @@ std::vector<andor_enum_index_t> ANDOR_EnumFeatureInfo::getAvailableIndices() con
 std::vector<andor_enum_index_t> ANDOR_EnumFeatureInfo::getImplementedIndices() const
 {
     return implementedIndex;
+}
+
+
+andor_enum_index_t ANDOR_EnumFeatureInfo::index() const
+{
+    return currentIndex;
+}
+
+
+void ANDOR_EnumFeatureInfo::swap(ANDOR_EnumFeatureInfo &v1, ANDOR_EnumFeatureInfo &v2)
+{
+    std::swap(v1.valueList,v2.valueList);
+    std::swap(v1.availableIndex,v2.availableIndex);
+    std::swap(v1.implementedIndex,v2.implementedIndex);
+
+    std::swap(v1.currentIndex, v2.currentIndex);
 }
