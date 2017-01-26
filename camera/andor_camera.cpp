@@ -251,16 +251,17 @@ bool ANDOR_Camera::connectToCamera(const ANDOR_Camera::CAMERA_IDENT_TAG ident_ta
     for ( ANDOR_CameraInfo info: foundCameras ) {
         switch (ident_tag) {
             case ANDOR_Camera::CameraModel:
-                ok = info.cameraModel.compare(tag_str);
+//                ok = info.cameraModel.compare(tag_str);
+                ok = info.cameraModel.value().compare(tag_str);
                 break;
             case ANDOR_Camera::CameraName:
-                ok = info.cameraName.compare(tag_str);
+                ok = info.cameraName.value().compare(tag_str);
                 break;
             case ANDOR_Camera::SerialNumber:
-                ok = info.serialNumber.compare(tag_str);
+                ok = info.serialNumber.value().compare(tag_str);
                 break;
             case ANDOR_Camera::ControllerID:
-                ok = info.controllerID.compare(tag_str);
+                ok = info.controllerID.value().compare(tag_str);
                 break;
         }
 
@@ -490,8 +491,11 @@ void ANDOR_Camera::logToFile(const ANDOR_Feature &feature, const int identation)
                     /*  ANDOR_CameraInfo constructor */
 
 ANDOR_CameraInfo::ANDOR_CameraInfo():
-    cameraModel(L"Unknown"), cameraName(L"Unknown"), serialNumber(L"Unknown"),
-    controllerID(L"Unknown"), interfaceType(L"Unknown"), device_index(-1)
+//  cameraModel(L"Unknown"), cameraName(L"Unknown"), serialNumber(L"Unknown"),
+//  controllerID(L"Unknown"), interfaceType(L"Unknown")
+    cameraModel(), cameraName(), serialNumber(),
+    controllerID(), interfaceType(), device_index(-1),
+    sensorWidth(0), sensorHeight(0), pixelWidth(0), pixelHeight(0)
 {
 }
 

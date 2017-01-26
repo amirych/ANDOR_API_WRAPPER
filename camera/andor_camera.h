@@ -37,6 +37,7 @@ const int ANDOR_SDK_ENUM_FEATURE_STRLEN = 30; // maximal length of string for en
 
 
 struct ANDOR_CameraInfo;      // just forward declaration
+class NonNumericFeatureValue;
 struct ANDOR_StringFeature;
 struct ANDOR_EnumFeature;
 class ANDOR_EnumFeatureInfo;
@@ -48,6 +49,7 @@ class ANDOR_EnumFeatureInfo;
 
 class ANDOR_API_WRAPPER_EXPORT ANDOR_Camera
 {
+    friend class NonNumericFeatureValue;
     friend struct ANDOR_StringFeature;
     friend struct ANDOR_EnumFeature;
     friend class ANDOR_EnumFeatureInfo;
@@ -211,8 +213,8 @@ protected:
             return *this;
         }
 
-        ANDOR_Feature & operator = (const ANDOR_StringFeature &val);
-        ANDOR_Feature & operator = (const ANDOR_EnumFeature &val);
+//        ANDOR_Feature & operator = (const ANDOR_StringFeature &val);
+//        ANDOR_Feature & operator = (const ANDOR_EnumFeature &val);
         ANDOR_Feature &  operator = (const andor_string_t &val);
         ANDOR_Feature &  operator = (const AT_WC *val);
 
@@ -352,28 +354,51 @@ protected:
 
 
 
+            /*   DECLARATION OF BASE CLASS FOR ANDOR SDK NON-NUMERIC TYPE FEATURES PRESENTATION  */
 
-                /*   DECLARATION OF CLASS FOR ANDOR SDK STRING-TYPE FEATURE PRESENTATION  */
 
-struct ANDOR_API_WRAPPER_EXPORT ANDOR_StringFeature: public andor_string_t
-{
-    using andor_string_t::andor_string_t;
-    explicit ANDOR_StringFeature();
-    ANDOR_StringFeature(ANDOR_Camera::ANDOR_Feature &feature);
+class NonNumericFeatureValue {
+    friend class ANDOR_Camera::ANDOR_Feature;
+protected:
+    andor_string_t _value;
+    explicit NonNumericFeatureValue();
+    NonNumericFeatureValue( const NonNumericFeatureValue &other);
+    NonNumericFeatureValue( NonNumericFeatureValue &&other);
+
+public:
+    andor_string_t value() const;
+
+    std::string value_to_string();
 };
 
 
 
-                /*   DECLARATION OF CLASS FOR ANDOR SDK ENUMERATED-TYPE FEATURE PRESENTATION  */
 
-struct ANDOR_API_WRAPPER_EXPORT ANDOR_EnumFeature: public andor_string_t
+                /*   DECLARATION OF CLASS FOR ANDOR SDK STRING-TYPE FEATURE PRESENTATION  */
+
+
+struct ANDOR_API_WRAPPER_EXPORT ANDOR_StringFeature: public NonNumericFeatureValue
+{
+    explicit ANDOR_StringFeature();
+    ANDOR_StringFeature(ANDOR_Camera::ANDOR_Feature &feature);
+    ANDOR_StringFeature(const ANDOR_StringFeature &other);
+    ANDOR_StringFeature(ANDOR_StringFeature &&other);
+    ANDOR_StringFeature & operator = (ANDOR_StringFeature other);
+};
+
+
+
+                /*   DECLARATION OF CLASSES FOR ANDOR SDK ENUMERATED-TYPE FEATURE PRESENTATION  */
+
+struct ANDOR_API_WRAPPER_EXPORT ANDOR_EnumFeature: public NonNumericFeatureValue
 {
     friend class ANDOR_Camera::ANDOR_Feature;
 
-    using andor_string_t::andor_string_t;
-
     explicit ANDOR_EnumFeature();
     ANDOR_EnumFeature(ANDOR_Camera::ANDOR_Feature &feature);
+    ANDOR_EnumFeature(const ANDOR_EnumFeature &other);
+    ANDOR_EnumFeature(ANDOR_EnumFeature &&other);
+    ANDOR_EnumFeature & operator = (ANDOR_EnumFeature other);
 
     andor_enum_index_t index() const;
 

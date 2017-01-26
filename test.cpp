@@ -14,7 +14,7 @@ int main()
     cam[L"AuxOutSourceTwo"] = 10;
 
     std::wstring s;
-    s = ef;
+//    s = ef;
 
     cam[L"AuxOutSourceTwo"] = s;
 
@@ -31,6 +31,7 @@ int main()
 
     ANDOR_StringFeature ss;
 
-    cam["AuxOutSourceTwo"] = ss = L"dedede";
+//    cam["AuxOutSourceTwo"] = ss = L"dedede";
+
 
 }

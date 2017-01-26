@@ -123,7 +123,9 @@ ANDOR_Camera::ANDOR_Feature::operator ANDOR_StringFeature()
 
     getString();
 
-    ANDOR_StringFeature f(at_string.c_str());
+    ANDOR_StringFeature f;
+
+    f._value = at_string;
 
     return f;
 }
@@ -137,7 +139,8 @@ ANDOR_Camera::ANDOR_Feature::operator ANDOR_EnumFeature()
 
     getEnumString();
 
-    ANDOR_EnumFeature f(at_string.c_str());
+    ANDOR_EnumFeature f;
+    f._value = at_string;
     f._index = at_index;
 
     return f;
@@ -482,29 +485,33 @@ void ANDOR_Camera::ANDOR_Feature::setEnumIndex(const andor_enum_index_t val)
 
 //    return f;
 //}
-ANDOR_Camera::ANDOR_Feature & ANDOR_Camera::ANDOR_Feature::operator = (const ANDOR_StringFeature &val)
-{
-    setString(val);
+//ANDOR_Camera::ANDOR_Feature & ANDOR_Camera::ANDOR_Feature::operator = (const ANDOR_StringFeature &val)
+//{
+//    setString(val);
 
-    return *this;
-}
+//    return *this;
+//}
 
 
-ANDOR_Camera::ANDOR_Feature & ANDOR_Camera::ANDOR_Feature::operator = (const ANDOR_EnumFeature &val)
-{
-    setEnumString(val);
+//ANDOR_Camera::ANDOR_Feature & ANDOR_Camera::ANDOR_Feature::operator = (const ANDOR_EnumFeature &val)
+//{
+//    setEnumString(val);
 
-    return *this;
-}
+//    return *this;
+//}
 
 
 ANDOR_Camera::ANDOR_Feature & ANDOR_Camera::ANDOR_Feature::operator = (const AT_WC* val)
 {
     switch ( featureType ) {
         case ANDOR_Camera::StringType:
-            return operator = (ANDOR_StringFeature(val));
+//            return operator = (ANDOR_StringFeature(val));
+            setString(val);
+            return *this;
         case ANDOR_Camera::EnumType:
-            return operator = (ANDOR_EnumFeature(val));
+//        return operator = (ANDOR_EnumFeature(val));
+            setEnumString(val);
+            return *this;
         default:
             throw AndorSDK_Exception(AT_ERR_NOTIMPLEMENTED,"Feature type missmatch!");
     }
@@ -578,33 +585,126 @@ void ANDOR_Camera::ANDOR_Feature::logHelper(const AT_WC *wstr)
 
                     /*  ANDOR SDK STRING AND ENUMERATED FEATURE CLASSES IMPLEMENTATION  */
 
-ANDOR_StringFeature::ANDOR_StringFeature(): andor_string_t()
+NonNumericFeatureValue::NonNumericFeatureValue():
+    _value()
+{
+
+}
+
+
+NonNumericFeatureValue::NonNumericFeatureValue(const NonNumericFeatureValue &other):
+    _value(other._value)
+{
+
+}
+
+
+NonNumericFeatureValue::NonNumericFeatureValue(NonNumericFeatureValue &&other):
+    NonNumericFeatureValue()
+{
+    std::swap(_value, other._value);
+}
+
+
+andor_string_t NonNumericFeatureValue::value() const
+{
+    return _value;
+}
+
+
+std::string NonNumericFeatureValue::value_to_string()
+{
+    std::wstring_convert<std::codecvt_utf8<wchar_t>> cnv;
+
+    return cnv.to_bytes(_value);
+
+}
+
+
+
+//ANDOR_StringFeature::ANDOR_StringFeature(): andor_string_t()
+ANDOR_StringFeature::ANDOR_StringFeature(): NonNumericFeatureValue()
 {
 }
 
 ANDOR_StringFeature::ANDOR_StringFeature(ANDOR_Camera::ANDOR_Feature &feature):
-    andor_string_t(feature.operator andor_string_t())
+//    andor_string_t(feature.operator andor_string_t())
+    NonNumericFeatureValue()
+{
+    feature.getString();
+    _value = feature.at_string;
+}
+
+
+ANDOR_StringFeature::ANDOR_StringFeature(const ANDOR_StringFeature &other):
+     NonNumericFeatureValue(other)
 {
 
 }
 
 
+ANDOR_StringFeature::ANDOR_StringFeature(ANDOR_StringFeature &&other):
+    NonNumericFeatureValue(std::move(other))
+{
+
+}
+
+
+ANDOR_StringFeature& ANDOR_StringFeature::operator = (ANDOR_StringFeature other)
+{
+    if ( this == &other ) return *this;
+
+    std::swap(_value, other._value);
+
+    return *this;
+}
 
 
 
 ANDOR_EnumFeature::ANDOR_EnumFeature():
-    andor_string_t(), _index(-1)
+//    andor_string_t(), _index(-1)
+    NonNumericFeatureValue(), _index(-1)
 {
 
 }
 
 
 ANDOR_EnumFeature::ANDOR_EnumFeature(ANDOR_Camera::ANDOR_Feature &feature):
-    andor_string_t(feature.operator andor_string_t())
+//    andor_string_t(feature.operator andor_string_t())
+    ANDOR_EnumFeature()
 {
+//    _index = feature.at_index;
+    feature.getEnumString();
+
+    _value = feature.at_string;
     _index = feature.at_index;
 }
 
+
+
+ANDOR_EnumFeature::ANDOR_EnumFeature(const ANDOR_EnumFeature &other):
+    NonNumericFeatureValue(other)
+{
+    _index = other._index;
+}
+
+
+ANDOR_EnumFeature::ANDOR_EnumFeature(ANDOR_EnumFeature &&other):
+    NonNumericFeatureValue(std::move(other))
+{
+    std::swap(_index, other._index);
+}
+
+
+ANDOR_EnumFeature & ANDOR_EnumFeature::operator = (ANDOR_EnumFeature other)
+{
+    if ( this == &other ) return *this;
+
+    std::swap(_value, other._value);
+    std::swap(_index, other._index);
+
+    return *this;
+}
 
 
             /*  ANDOR SDK ENUMERATED FEATURE INFO CLASS IMPLEMENTATION  */
