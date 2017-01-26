@@ -352,6 +352,7 @@ protected:
 
 
 
+
                 /*   DECLARATION OF CLASS FOR ANDOR SDK STRING-TYPE FEATURE PRESENTATION  */
 
 struct ANDOR_API_WRAPPER_EXPORT ANDOR_StringFeature: public andor_string_t

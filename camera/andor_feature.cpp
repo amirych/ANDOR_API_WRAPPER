@@ -647,6 +647,7 @@ ANDOR_EnumFeatureInfo::ANDOR_EnumFeatureInfo(ANDOR_Camera::ANDOR_Feature &featur
     ANDOR_EnumFeatureInfo()
 {
     valueList = feature.getEnumInfo(implementedIndex, availableIndex);
+    currentIndex = feature.at_index;
 }
 
 
