@@ -125,6 +125,7 @@ ANDOR_Camera::ANDOR_Feature::operator ANDOR_StringFeature()
 
     ANDOR_StringFeature f;
 
+    f._name = featureNameStr;
     f._value = at_string;
 
     return f;
@@ -140,6 +141,7 @@ ANDOR_Camera::ANDOR_Feature::operator ANDOR_EnumFeature()
     getEnumString();
 
     ANDOR_EnumFeature f;
+    f._name = featureNameStr;
     f._value = at_string;
     f._index = at_index;
 
@@ -371,7 +373,8 @@ ANDOR_Camera::ANDOR_Feature::operator ANDOR_EnumFeatureInfo()
 
     ANDOR_EnumFeatureInfo info;
 
-    info.valueList = getEnumInfo(info.implementedIndex, info.availableIndex);
+    info.valueList = getEnumInfo(info._implementedIndex, info._availableIndex);
+    info._name = featureNameStr;
 
     return info;
 }
@@ -586,14 +589,14 @@ void ANDOR_Camera::ANDOR_Feature::logHelper(const AT_WC *wstr)
                     /*  ANDOR SDK STRING AND ENUMERATED FEATURE CLASSES IMPLEMENTATION  */
 
 NonNumericFeatureValue::NonNumericFeatureValue():
-    _value()
+    _name(), _value()
 {
 
 }
 
 
 NonNumericFeatureValue::NonNumericFeatureValue(const NonNumericFeatureValue &other):
-    _value(other._value)
+    _name(other._name), _value(other._value)
 {
 
 }
@@ -602,7 +605,13 @@ NonNumericFeatureValue::NonNumericFeatureValue(const NonNumericFeatureValue &oth
 NonNumericFeatureValue::NonNumericFeatureValue(NonNumericFeatureValue &&other):
     NonNumericFeatureValue()
 {
-    std::swap(_value, other._value);
+    swap(*this,other);
+}
+
+
+andor_string_t NonNumericFeatureValue::name() const
+{
+    return _name;
 }
 
 
@@ -620,6 +629,11 @@ std::string NonNumericFeatureValue::value_to_string()
 
 }
 
+void NonNumericFeatureValue::swap(NonNumericFeatureValue &v1, NonNumericFeatureValue &v2)
+{
+    std::swap(v1._name, v2._name);
+    std::swap(v1._value, v2._value);
+}
 
 
 //ANDOR_StringFeature::ANDOR_StringFeature(): andor_string_t()
@@ -632,6 +646,8 @@ ANDOR_StringFeature::ANDOR_StringFeature(ANDOR_Camera::ANDOR_Feature &feature):
     NonNumericFeatureValue()
 {
     feature.getString();
+
+    _name = feature.featureNameStr;
     _value = feature.at_string;
 }
 
@@ -654,7 +670,9 @@ ANDOR_StringFeature& ANDOR_StringFeature::operator = (ANDOR_StringFeature other)
 {
     if ( this == &other ) return *this;
 
-    std::swap(_value, other._value);
+//    std::swap(_name, other._name);
+//    std::swap(_value, other._value);
+    NonNumericFeatureValue::swap(*this,other);
 
     return *this;
 }
@@ -676,6 +694,7 @@ ANDOR_EnumFeature::ANDOR_EnumFeature(ANDOR_Camera::ANDOR_Feature &feature):
 //    _index = feature.at_index;
     feature.getEnumString();
 
+    _name = feature.featureNameStr;
     _value = feature.at_string;
     _index = feature.at_index;
 }
@@ -700,7 +719,7 @@ ANDOR_EnumFeature & ANDOR_EnumFeature::operator = (ANDOR_EnumFeature other)
 {
     if ( this == &other ) return *this;
 
-    std::swap(_value, other._value);
+    NonNumericFeatureValue::swap(*this,other);
     std::swap(_index, other._index);
 
     return *this;
@@ -710,14 +729,15 @@ ANDOR_EnumFeature & ANDOR_EnumFeature::operator = (ANDOR_EnumFeature other)
             /*  ANDOR SDK ENUMERATED FEATURE INFO CLASS IMPLEMENTATION  */
 
 ANDOR_EnumFeatureInfo::ANDOR_EnumFeatureInfo():
-    valueList(), availableIndex(), implementedIndex(), currentIndex(-1)
+    _name(), valueList(), _availableIndex(), _implementedIndex(), currentIndex(-1)
 {
 }
 
 
 ANDOR_EnumFeatureInfo::ANDOR_EnumFeatureInfo(const ANDOR_EnumFeatureInfo &other):
-    valueList(other.valueList), availableIndex(other.availableIndex),
-    implementedIndex(other.implementedIndex), currentIndex(other.currentIndex)
+    _name(other._name),
+    valueList(other.valueList), _availableIndex(other._availableIndex),
+    _implementedIndex(other._implementedIndex), currentIndex(other.currentIndex)
 {
 
 }
@@ -746,22 +766,30 @@ ANDOR_EnumFeatureInfo & ANDOR_EnumFeatureInfo::operator =(ANDOR_EnumFeatureInfo 
 ANDOR_EnumFeatureInfo::ANDOR_EnumFeatureInfo(ANDOR_Camera::ANDOR_Feature &feature):
     ANDOR_EnumFeatureInfo()
 {
-    valueList = feature.getEnumInfo(implementedIndex, availableIndex);
+    valueList = feature.getEnumInfo(_implementedIndex, _availableIndex);
+    _name = feature.featureNameStr;
     currentIndex = feature.at_index;
 }
 
 
-std::vector<andor_string_t> ANDOR_EnumFeatureInfo::getValues() const
+
+andor_string_t ANDOR_EnumFeatureInfo::name() const
+{
+    return _name;
+}
+
+
+std::vector<andor_string_t> ANDOR_EnumFeatureInfo::values() const
 {
     return valueList;
 }
 
 
-std::vector<andor_string_t> ANDOR_EnumFeatureInfo::getAvailableValues()
+std::vector<andor_string_t> ANDOR_EnumFeatureInfo::availableValues()
 {
     std::vector<andor_string_t> vals;
 
-    for ( size_t i = 0; i < availableIndex.size(); ++i ) {
+    for ( size_t i = 0; i < _availableIndex.size(); ++i ) {
         vals.push_back(valueList[i]);
     }
 
@@ -769,11 +797,11 @@ std::vector<andor_string_t> ANDOR_EnumFeatureInfo::getAvailableValues()
 }
 
 
-std::vector<andor_string_t> ANDOR_EnumFeatureInfo::getImplementedValues()
+std::vector<andor_string_t> ANDOR_EnumFeatureInfo::implementedValues()
 {
     std::vector<andor_string_t> vals;
 
-    for ( size_t i = 0; i < implementedIndex.size(); ++i ) {
+    for ( size_t i = 0; i < _implementedIndex.size(); ++i ) {
         vals.push_back(valueList[i]);
     }
 
@@ -781,15 +809,15 @@ std::vector<andor_string_t> ANDOR_EnumFeatureInfo::getImplementedValues()
 }
 
 
-std::vector<andor_enum_index_t> ANDOR_EnumFeatureInfo::getAvailableIndices() const
+std::vector<andor_enum_index_t> ANDOR_EnumFeatureInfo::availableIndices() const
 {
-    return availableIndex;
+    return _availableIndex;
 }
 
 
-std::vector<andor_enum_index_t> ANDOR_EnumFeatureInfo::getImplementedIndices() const
+std::vector<andor_enum_index_t> ANDOR_EnumFeatureInfo::implementedIndices() const
 {
-    return implementedIndex;
+    return _implementedIndex;
 }
 
 
@@ -801,9 +829,10 @@ andor_enum_index_t ANDOR_EnumFeatureInfo::index() const
 
 void ANDOR_EnumFeatureInfo::swap(ANDOR_EnumFeatureInfo &v1, ANDOR_EnumFeatureInfo &v2)
 {
+    std::swap(v1._name, v2._name);
     std::swap(v1.valueList,v2.valueList);
-    std::swap(v1.availableIndex,v2.availableIndex);
-    std::swap(v1.implementedIndex,v2.implementedIndex);
+    std::swap(v1._availableIndex,v2._availableIndex);
+    std::swap(v1._implementedIndex,v2._implementedIndex);
 
     std::swap(v1.currentIndex, v2.currentIndex);
 }

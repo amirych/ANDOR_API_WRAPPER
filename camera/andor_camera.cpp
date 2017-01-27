@@ -65,7 +65,9 @@ ANDOR_Camera::ANDOR_Camera():
     logLevel(LOG_LEVEL_ERROR),
     lastError(AT_SUCCESS), cameraLog(nullptr), cameraHndl(AT_HANDLE_SYSTEM),
     CameraPresent(L"CameraPresent"), CameraAcquiring(L"CameraAcquiring"), cameraFeature(),
-    waitBufferThread()
+    waitBufferThread(),
+    imageBufferAddr(nullptr), imageBuffersNumber(0),
+    maxBuffersNumber(ANDOR_CAMERA_DEFAULT_MAX_BUFFERS_NUMBER), requestedBuffersNumber(0)
 {
     // camera handler for "CameraPresent"
     // and "CameraAcquiring" features will be
@@ -90,6 +92,8 @@ ANDOR_Camera::~ANDOR_Camera()
     if ( !numberOfCreatedObjects ) {
         AT_FinaliseLibrary();
     }
+
+    deleteImageBuffers();
 }
 
 
@@ -316,6 +320,18 @@ void ANDOR_Camera::disconnectFromCamera() // here there is no SDK error processi
 
 
 
+void ANDOR_Camera::setMaxBuffersNumber(const size_t num)
+{
+    maxBuffersNumber = num;
+}
+
+
+size_t ANDOR_Camera::getMaxBuffersNumber() const
+{
+    return maxBuffersNumber;
+}
+
+
 void ANDOR_Camera::logToFile(const LOG_IDENTIFICATOR ident, const std::string &log_str, const int identation)
 {
     if ( !cameraLog ) return;
@@ -418,6 +434,41 @@ ANDOR_Camera::ANDOR_Feature & ANDOR_Camera::operator [](const char* feature_name
 
 
 
+void ANDOR_Camera::operator ()(const andor_string_t & command_name)
+{
+    andor_string_t str = L"AT_Command(" + std::to_wstring(cameraHndl) +
+                         L", " + command_name + L")";
+
+    std::wstring_convert<std::codecvt_utf8<AT_WC>> cnv;
+    std::string log_str = cnv.to_bytes(str);
+
+    if ( logLevel == ANDOR_Camera::LOG_LEVEL_VERBOSE ) logToFile(ANDOR_Camera::CAMERA_INFO,log_str);
+    andor_sdk_assert( AT_Command(cameraHndl,command_name.c_str()), log_str);
+}
+
+
+void ANDOR_Camera::operator ()(const AT_WC* command_name)
+{
+    operator ()(andor_string_t(command_name));
+}
+
+
+void ANDOR_Camera::operator ()(const std::string & command_name)
+{
+    std::wstring_convert<std::codecvt_utf8<AT_WC>> cvt;
+
+    operator ()(cvt.from_bytes(command_name));
+}
+
+
+void ANDOR_Camera::operator ()(const char* command_name)
+{
+    operator ()(std::string(command_name));
+}
+
+
+
+
                     /*  PROTECTED METHODS  */
 
 int ANDOR_Camera::scanConnectedCameras()
@@ -480,6 +531,20 @@ void ANDOR_Camera::logToFile(const ANDOR_Feature &feature, const int identation)
 }
 
 
+void ANDOR_Camera::deleteImageBuffers()
+{
+    if ( !imageBufferAddr ) return;
+
+    std::string log_str = "AT_Flush(" + std::to_string(cameraHndl) + ")";
+    if ( logLevel == ANDOR_Camera::LOG_LEVEL_VERBOSE ) logToFile(ANDOR_Camera::CAMERA_INFO,log_str);
+    andor_sdk_assert( AT_Flush(cameraHndl), log_str );
+
+    unsigned char** addr = imageBufferAddr.get();
+
+    for ( size_t i = 0; i < imageBuffersNumber; ++i ) {
+        delete[] addr[i];
+    }
+}
 
 
                             /*  STATIC PUBLIC METHODS  */

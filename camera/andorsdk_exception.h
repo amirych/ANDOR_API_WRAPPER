@@ -12,13 +12,19 @@ public:
 
     int getError() const;
 
+#ifdef _MSC_VER
+#if (_MSC_VER > 1800)
     const char* what() const noexcept;
-
+#else
+    const char* what() const; // to compile with VS2013
+#endif
+#else
+    const char* what() const noexcept;
+#endif
 private:
     std::string msg;
     int errCode;
 };
-
 
 inline void andor_sdk_assert(int err, const std::string& context = std::string())
 {

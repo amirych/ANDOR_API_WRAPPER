@@ -35,6 +35,7 @@ typedef int andor_enum_index_t; // type for ANDOR SDK enumerated feature index
 
 const int ANDOR_SDK_ENUM_FEATURE_STRLEN = 30; // maximal length of string for enumerated feature
 
+#define ANDOR_CAMERA_DEFAULT_MAX_BUFFERS_NUMBER 50 // default maximum buffers number to be allocated for reading data
 
 struct ANDOR_CameraInfo;      // just forward declaration
 class NonNumericFeatureValue;
@@ -293,13 +294,25 @@ public:
     void disconnectFromCamera();
 
 
+    virtual void acquisitionStart();
+    virtual void acquisitionStop();
+
+    void setMaxBuffersNumber(const size_t num);
+    size_t getMaxBuffersNumber() const;
+
             /* operator[] for accessing Andor SDK features (const and non-const versions) */
 
     ANDOR_Feature& operator[](const andor_string_t &feature_name);
     ANDOR_Feature& operator[](const AT_WC* feature_name);
     ANDOR_Feature& operator[](const std::string &feature_name);
-    ANDOR_Feature& operator[](const char *feature_name);
+    ANDOR_Feature& operator[](const char* feature_name);
 
+            /*  operator() - wrapper to AT_Command  */
+
+    void operator ()(const andor_string_t & command_name);
+    void operator ()(const AT_WC* command_name);
+    void operator ()(const std::string & command_name);
+    void operator ()(const char* command_name);
 
             /* Andor SDK global features */
 
@@ -339,6 +352,14 @@ protected:
 
     void waitBufferFunc();
 
+    std::unique_ptr<unsigned char*> imageBufferAddr;
+    size_t imageBuffersNumber;
+
+    size_t maxBuffersNumber;
+    size_t requestedBuffersNumber;
+
+    void deleteImageBuffers(); // flush and delete image buffers
+
                 /*  static class members and methods  */
 
     static std::list<ANDOR_CameraInfo> foundCameras;
@@ -356,16 +377,24 @@ protected:
 
             /*   DECLARATION OF BASE CLASS FOR ANDOR SDK NON-NUMERIC TYPE FEATURES PRESENTATION  */
 
+//
+// I don't use here constructors inheritance to compile the sources with the VS2013.
+//
+
 
 class NonNumericFeatureValue {
     friend class ANDOR_Camera::ANDOR_Feature;
 protected:
+    andor_string_t _name;
     andor_string_t _value;
     explicit NonNumericFeatureValue();
     NonNumericFeatureValue( const NonNumericFeatureValue &other);
     NonNumericFeatureValue( NonNumericFeatureValue &&other);
 
+    inline void swap(NonNumericFeatureValue &v1, NonNumericFeatureValue &v2);
+
 public:
+    andor_string_t name() const;
     andor_string_t value() const;
 
     std::string value_to_string();
@@ -412,9 +441,10 @@ class ANDOR_API_WRAPPER_EXPORT ANDOR_EnumFeatureInfo
 {
     friend class ANDOR_Camera::ANDOR_Feature;
 
+    andor_string_t _name;
     std::vector<andor_string_t> valueList;
-    std::vector<andor_enum_index_t> availableIndex;
-    std::vector<andor_enum_index_t> implementedIndex;
+    std::vector<andor_enum_index_t> _availableIndex;
+    std::vector<andor_enum_index_t> _implementedIndex;
 
     andor_enum_index_t currentIndex;
 
@@ -428,14 +458,15 @@ public:
 
     ANDOR_EnumFeatureInfo & operator =(ANDOR_EnumFeatureInfo other);
 
-    std::vector<andor_string_t> getValues() const;
-    std::vector<andor_string_t> getAvailableValues();
-    std::vector<andor_string_t> getImplementedValues();
+    andor_string_t name() const;
+    std::vector<andor_string_t> values() const;
+    std::vector<andor_string_t> availableValues();
+    std::vector<andor_string_t> implementedValues();
 
-    std::vector<andor_enum_index_t> getAvailableIndices() const;
-    std::vector<andor_enum_index_t> getImplementedIndices() const;
+    std::vector<andor_enum_index_t> availableIndices() const;
+    std::vector<andor_enum_index_t> implementedIndices() const;
 
-    andor_enum_index_t index() const;
+    andor_enum_index_t index() const; // current selected index for enumerated feature
 };
 
 
