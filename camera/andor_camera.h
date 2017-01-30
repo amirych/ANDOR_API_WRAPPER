@@ -358,7 +358,8 @@ protected:
     size_t maxBuffersNumber;
     size_t requestedBuffersNumber;
 
-    void deleteImageBuffers(); // flush and delete image buffers
+    void allocateImageBuffers(size_t imageSizeBytes);  // allocate image buffers
+    void deleteImageBuffers();    // flush and delete image buffers
 
                 /*  static class members and methods  */
 

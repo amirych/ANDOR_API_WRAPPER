@@ -242,6 +242,7 @@ void ANDOR_Camera::ANDOR_Feature::getString()
 
         delete[] str;
     } else {
+        at_string = L"";
         throw AndorSDK_Exception(AT_ERR_NULL_MAXSTRINGLENGTH,"Length of string feature value is 0!");
     }
 }

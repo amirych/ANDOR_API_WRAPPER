@@ -43,6 +43,8 @@ static int AT_EXP_CONV disconnection_callback(AT_H hndl, AT_WC* name, void* cont
     if ( camera == nullptr ) return AT_ERR_INVALIDHANDLE; // just check
 
     camera->disconnectFromCamera();
+
+    return AT_SUCCESS;
 }
 
 
@@ -252,6 +254,7 @@ bool ANDOR_Camera::connectToCamera(const ANDOR_Camera::CAMERA_IDENT_TAG ident_ta
 
     int ok;
 
+    // here, I ignore possible errors from access to SDK features!!!
     for ( ANDOR_CameraInfo info: foundCameras ) {
         switch (ident_tag) {
             case ANDOR_Camera::CameraModel:
@@ -329,6 +332,67 @@ void ANDOR_Camera::setMaxBuffersNumber(const size_t num)
 size_t ANDOR_Camera::getMaxBuffersNumber() const
 {
     return maxBuffersNumber;
+}
+
+
+void ANDOR_Camera::acquisitionStart()
+{
+    std::string log_msg;
+
+    if ( !CameraPresent ) {
+        log_msg = "Cannot start an acquisition! It seems camera is not connected or the connection was lost!";
+        logToFile(ANDOR_Camera::CAMERA_ERROR, log_msg);
+        return;
+    }
+
+    if ( CameraAcquiring ) { // !!!!!!  MAY DONT WORK WITH APOGEE CAMERAS! NEEDS CHECK!!!!
+        log_msg = "Cannot start an acquisition! Camera is still acquiring!";
+        logToFile(ANDOR_Camera::CAMERA_INFO, log_msg);
+        return;
+    }
+
+    try {
+        // compute number and allocate image buffers
+
+        size_t frame_count = (*this)["FrameCounter"];
+        size_t accum_count = (*this)["AccumulateCounter"];
+        size_t image_size = (*this)["ImageSizeBytes"];
+
+        requestedBuffersNumber = frame_count/accum_count;
+
+        deleteImageBuffers(); // flush and delete previous allocated buffers
+
+        allocateImageBuffers(image_size);
+
+        lastError = AT_SUCCESS;
+
+        (*this)("AcquisitionStart");
+
+    } catch (std::bad_alloc &ex) {
+        log_msg = "Cannot start an acquisition! Memory allocation for image buffers failed!";
+        logToFile(ANDOR_Camera::SDK_ERROR, log_msg);
+        lastError = AT_ERR_NOMEMORY;
+        return;
+    } catch ( AndorSDK_Exception &ex ) {
+        lastError = ex.getError();
+        logToFile(ANDOR_Camera::SDK_ERROR, ex.what());
+        throw ex; // re-throw the exception to user code
+    }
+}
+
+
+void ANDOR_Camera::acquisitionStop()
+{
+    std::string log_msg;
+
+    try {
+        (*this)("AcquisitionStop");
+    } catch ( AndorSDK_Exception &ex ) {
+        lastError = ex.getError();
+        log_msg = "Failed to stop acquisition!";
+        logToFile(ANDOR_Camera::SDK_ERROR, log_msg);
+        throw ex; // re-throw the exception to user code
+    }
 }
 
 
@@ -531,12 +595,48 @@ void ANDOR_Camera::logToFile(const ANDOR_Feature &feature, const int identation)
 }
 
 
+void ANDOR_Camera::allocateImageBuffers(size_t imageSizeBytes)
+{
+    std::string log_msg;
+
+    if ( requestedBuffersNumber == 0 ) {
+        log_msg = "Cannot allocate image buffers! The requested number of images is 0!";
+        throw AndorSDK_Exception(AT_ERR_NOMEMORY, log_msg);
+    }
+
+    imageBuffersNumber = ( requestedBuffersNumber > maxBuffersNumber ) ? maxBuffersNumber : requestedBuffersNumber;
+
+    imageBufferAddr = std::unique_ptr<unsigned char*>(new unsigned char*[imageBuffersNumber]);
+
+    unsigned char** buff_ptr = imageBufferAddr.get();
+
+    // init to nullptr
+    for ( size_t i = 0; i < imageBuffersNumber; ++i ) {
+        buff_ptr = nullptr;
+    }
+
+    // allocate memory for image buffers (use of alignment required by SDK)
+    char addr[20];
+    for ( size_t i = 0; i < imageBuffersNumber; ++i ) {
+        alignas(8) unsigned char* pbuff = new unsigned char[imageSizeBytes];
+        buff_ptr[i] = pbuff;
+
+        int n = snprintf(addr,20,"%p",buff_ptr[i]);
+        log_msg = "AT_QueueBuffer(" + std::to_string(cameraHndl) + ", " + addr + ", " + std::to_string(imageSizeBytes) + ")";
+        if ( logLevel == ANDOR_Camera::LOG_LEVEL_VERBOSE ) logToFile(ANDOR_Camera::CAMERA_INFO, log_msg);
+
+        andor_sdk_assert( AT_QueueBuffer(cameraHndl, buff_ptr[i], imageSizeBytes), log_msg);
+    }
+}
+
+
 void ANDOR_Camera::deleteImageBuffers()
 {
     if ( !imageBufferAddr ) return;
 
     std::string log_str = "AT_Flush(" + std::to_string(cameraHndl) + ")";
     if ( logLevel == ANDOR_Camera::LOG_LEVEL_VERBOSE ) logToFile(ANDOR_Camera::CAMERA_INFO,log_str);
+
     andor_sdk_assert( AT_Flush(cameraHndl), log_str );
 
     unsigned char** addr = imageBufferAddr.get();
