@@ -15,6 +15,7 @@
 #include <sstream>
 #include <functional>
 #include <thread>
+#include <memory>
 
 // for MS compilers: disable multiple warnings about DLL-exports for the STL containers
 // (and many others C++11 defined classes, e.g., thread)
@@ -38,6 +39,7 @@ const int ANDOR_SDK_ENUM_FEATURE_STRLEN = 30; // maximal length of string for en
 #define ANDOR_CAMERA_DEFAULT_MAX_BUFFERS_NUMBER 50 // default maximum buffers number to be allocated for reading data
 
 struct ANDOR_CameraInfo;      // just forward declaration
+class ANDOR_FeatureInfo;
 class NonNumericFeatureValue;
 struct ANDOR_StringFeature;
 struct ANDOR_EnumFeature;
@@ -51,6 +53,7 @@ class ANDOR_EnumFeatureInfo;
 class ANDOR_API_WRAPPER_EXPORT ANDOR_Camera
 {
     friend class NonNumericFeatureValue;
+    friend class ANDOR_FeatureInfo;
     friend struct ANDOR_StringFeature;
     friend struct ANDOR_EnumFeature;
     friend class ANDOR_EnumFeatureInfo;
@@ -78,6 +81,7 @@ protected:
                 /*   DECLARATION OF A PROXY CLASS TO ACCESS ANDOR SDK FEATURES  */
 
     class ANDOR_Feature {
+        friend class ANDOR_FeatureInfo;
         friend struct ANDOR_StringFeature;
         friend struct ANDOR_EnumFeature;
         friend class ANDOR_EnumFeatureInfo;
@@ -148,6 +152,10 @@ protected:
         explicit operator ANDOR_EnumFeature();
 
 
+                 // get basic info for SDK feature
+
+        explicit operator ANDOR_FeatureInfo();
+
                  // get range of numeric feature and list of enumarated feature values
 
         template<typename T, typename = typename std::enable_if<std::is_arithmetic<T>::value>::type>
@@ -182,6 +190,7 @@ protected:
 
         explicit operator ANDOR_EnumFeatureInfo();
 
+        bool operator !();
 
                  // set feature value operators
 
@@ -259,6 +268,7 @@ protected:
         void getEnumString();
         void getEnumIndex();
 
+        void getFeatureInfo(bool *is_impl, bool *is_read, bool *is_readonly, bool *is_write);
 
         // format log message for ANDOR SDK function calling
         // (the first argument is the name of SDK function, the others are its arguments)
@@ -375,6 +385,35 @@ protected:
 
 
 
+            /*   DECLARATION OF CLASS FOR ANDOR FEATURE INFO   */
+
+class ANDOR_API_WRAPPER_EXPORT ANDOR_FeatureInfo
+{
+    friend class ANDOR_Camera::ANDOR_Feature;
+
+    andor_string_t _name;
+
+    bool _isImplemented;
+    bool _isReadable;
+    bool _isReadOnly;
+    bool _isWritable;
+
+    inline void swap(ANDOR_FeatureInfo &v1, ANDOR_FeatureInfo &v2);
+
+public:
+    explicit ANDOR_FeatureInfo();
+    ANDOR_FeatureInfo(ANDOR_Camera::ANDOR_Feature &feature);
+    ANDOR_FeatureInfo(const ANDOR_FeatureInfo &other);
+    ANDOR_FeatureInfo(ANDOR_FeatureInfo &&other);
+    ANDOR_FeatureInfo & operator = (ANDOR_FeatureInfo other);
+
+    andor_string_t name() const;
+    bool isImplemented() const;
+    bool isReadable() const;
+    bool isReadOnly() const;
+    bool isWritable() const;
+};
+
 
             /*   DECLARATION OF BASE CLASS FOR ANDOR SDK NON-NUMERIC TYPE FEATURES PRESENTATION  */
 
@@ -393,7 +432,6 @@ protected:
     NonNumericFeatureValue( NonNumericFeatureValue &&other);
 
     inline void swap(NonNumericFeatureValue &v1, NonNumericFeatureValue &v2);
-
 public:
     andor_string_t name() const;
     andor_string_t value() const;

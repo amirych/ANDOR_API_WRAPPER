@@ -22,3 +22,7 @@ target_link_libraries(${ANDOR_API_WRAPPER_LIB} atcore)
 set(TEST_PROG test_prog)
 add_executable(${TEST_PROG} test.cpp)
 target_link_libraries(${TEST_PROG} ${ANDOR_API_WRAPPER_LIB})
+
+
+install (TARGETS ${ANDOR_API_WRAPPER_LIB} DESTINATION lib)
+install (TARGETS ${TEST_PROG} DESTINATION bin)

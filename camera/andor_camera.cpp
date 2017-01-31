@@ -345,7 +345,7 @@ void ANDOR_Camera::acquisitionStart()
         return;
     }
 
-    if ( CameraAcquiring ) { // !!!!!!  MAY DONT WORK WITH APOGEE CAMERAS! NEEDS CHECK!!!!
+    if ( CameraAcquiring ) { // !!!!!!  MAY NOT WORK WITH APOGEE CAMERAS! NEEDS CHECK!!!!
         log_msg = "Cannot start an acquisition! Camera is still acquiring!";
         logToFile(ANDOR_Camera::CAMERA_INFO, log_msg);
         return;
@@ -612,7 +612,7 @@ void ANDOR_Camera::allocateImageBuffers(size_t imageSizeBytes)
 
     // init to nullptr
     for ( size_t i = 0; i < imageBuffersNumber; ++i ) {
-        buff_ptr = nullptr;
+        buff_ptr[i] = nullptr;
     }
 
     // allocate memory for image buffers (use of alignment required by SDK)
@@ -621,7 +621,11 @@ void ANDOR_Camera::allocateImageBuffers(size_t imageSizeBytes)
         alignas(8) unsigned char* pbuff = new unsigned char[imageSizeBytes];
         buff_ptr[i] = pbuff;
 
+#ifdef _MSC_VER
+        int n = _snprintf(addr,20,"%p",buff_ptr[i]);
+#else
         int n = snprintf(addr,20,"%p",buff_ptr[i]);
+#endif
         log_msg = "AT_QueueBuffer(" + std::to_string(cameraHndl) + ", " + addr + ", " + std::to_string(imageSizeBytes) + ")";
         if ( logLevel == ANDOR_Camera::LOG_LEVEL_VERBOSE ) logToFile(ANDOR_Camera::CAMERA_INFO, log_msg);
 
@@ -639,10 +643,20 @@ void ANDOR_Camera::deleteImageBuffers()
 
     andor_sdk_assert( AT_Flush(cameraHndl), log_str );
 
-    unsigned char** addr = imageBufferAddr.get();
+    unsigned char** buff_ptr = imageBufferAddr.get();
 
     for ( size_t i = 0; i < imageBuffersNumber; ++i ) {
-        delete[] addr[i];
+        if ( logLevel == ANDOR_Camera::LOG_LEVEL_VERBOSE ) {
+            char addr[20];
+#ifdef _MSC_VER
+            int n = _snprintf(addr,20,"%p",buff_ptr[i]);
+#else
+            int n = snprintf(addr,20,"%p",buff_ptr[i]);
+#endif
+            log_str = std::string("Delete image buffer at address: ") + addr;
+            logToFile(ANDOR_Camera::CAMERA_INFO,log_str,1);
+        }
+        delete[] buff_ptr[i];
     }
 }
 

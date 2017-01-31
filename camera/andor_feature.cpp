@@ -366,6 +366,55 @@ std::vector<andor_string_t> ANDOR_Camera::ANDOR_Feature::getEnumInfo(std::vector
 }
 
 
+
+void ANDOR_Camera::ANDOR_Feature::getFeatureInfo(bool *is_impl, bool *is_read, bool *is_readonly, bool *is_write)
+{
+    AT_BOOL flag;
+
+    std::string log_msg;
+
+    if ( is_impl == nullptr || is_read == nullptr || is_readonly == nullptr || is_write == nullptr ) return;
+
+    formatLogMessage("AT_IsImplemented","&flag");
+
+    andor_sdk_assert( AT_IsImplemented(deviceHndl,featureName,&flag), log_msg);
+
+    *is_impl = flag;
+
+
+    formatLogMessage("AT_IsReadable","&flag");
+
+    andor_sdk_assert( AT_IsReadable(deviceHndl,featureName,&flag), log_msg);
+
+    *is_read = flag;
+
+
+    formatLogMessage("AT_IsReadOnly","&flag");
+
+    andor_sdk_assert( AT_IsReadOnly(deviceHndl,featureName,&flag), log_msg);
+
+    *is_readonly = flag;
+
+
+    formatLogMessage("AT_IsWritable","&flag");
+
+    andor_sdk_assert( AT_IsWritable(deviceHndl,featureName,&flag), log_msg);
+
+    *is_write = flag;
+}
+
+
+
+ANDOR_Camera::ANDOR_Feature::operator ANDOR_FeatureInfo()
+{
+    ANDOR_FeatureInfo info;
+
+    getFeatureInfo(&info._isImplemented, &info._isReadable, &info._isReadOnly, &info._isWritable);
+
+    return info;
+}
+
+
 ANDOR_Camera::ANDOR_Feature::operator ANDOR_EnumFeatureInfo()
 {
     if ( featureType != ANDOR_Camera::EnumType ) {
@@ -378,6 +427,26 @@ ANDOR_Camera::ANDOR_Feature::operator ANDOR_EnumFeatureInfo()
     info._name = featureNameStr;
 
     return info;
+}
+
+
+bool ANDOR_Camera::ANDOR_Feature::operator !()
+{
+    switch ( featureType ) {
+        case ANDOR_Camera::BoolType: {
+            return !at_bool;
+        }
+        case ANDOR_Camera::IntType: {
+            return !at64_val;
+        }
+        case ANDOR_Camera::FloatType: {
+            return !at_float;
+        }
+        case ANDOR_Camera::EnumType:
+        case ANDOR_Camera::StringType: { // return 'true' if string is empty
+            return at_string.empty() ? false : true;
+        }
+    }
 }
 
 
@@ -583,6 +652,86 @@ void ANDOR_Camera::ANDOR_Feature::logHelper(const andor_string_t &wstr)
 void ANDOR_Camera::ANDOR_Feature::logHelper(const AT_WC *wstr)
 {
     logHelper(andor_string_t(wstr));
+}
+
+
+
+                    /*  IMPLEMENTATION OF CLASS FOR BASIC FEATURE INFO  */
+
+
+ANDOR_FeatureInfo::ANDOR_FeatureInfo():
+    _name(),
+    _isImplemented(false), _isReadable(false), _isReadOnly(false), _isWritable(false)
+{
+}
+
+
+ANDOR_FeatureInfo::ANDOR_FeatureInfo(ANDOR_Camera::ANDOR_Feature &feature):
+    ANDOR_FeatureInfo()
+{
+    _name = feature.featureNameStr;
+    feature.getFeatureInfo(&_isImplemented, &_isReadable, &_isReadOnly, &_isWritable);
+}
+
+
+ANDOR_FeatureInfo::ANDOR_FeatureInfo(const ANDOR_FeatureInfo &other):
+    _name(other._name),
+    _isImplemented(other._isImplemented), _isReadable(other._isReadable),
+    _isReadOnly(other._isReadOnly), _isWritable(other._isWritable)
+{
+}
+
+
+ANDOR_FeatureInfo::ANDOR_FeatureInfo(ANDOR_FeatureInfo &&other):
+    ANDOR_FeatureInfo()
+{
+    swap(*this, other);
+}
+
+
+ANDOR_FeatureInfo & ANDOR_FeatureInfo::operator = (ANDOR_FeatureInfo other)
+{
+    swap(*this, other);
+}
+
+
+andor_string_t ANDOR_FeatureInfo::name() const
+{
+    return _name;
+}
+
+
+bool ANDOR_FeatureInfo::isImplemented() const
+{
+    return _isImplemented;
+}
+
+
+bool ANDOR_FeatureInfo::isReadable() const
+{
+    return _isReadable;
+}
+
+
+bool ANDOR_FeatureInfo::isReadOnly() const
+{
+    return _isReadOnly;
+}
+
+
+bool ANDOR_FeatureInfo::isWritable() const
+{
+    return _isWritable;
+}
+
+
+void ANDOR_FeatureInfo::swap(ANDOR_FeatureInfo &v1, ANDOR_FeatureInfo &v2)
+{
+    std::swap(v1._name, v2._name);
+    std::swap(v1._isImplemented, v2._isImplemented);
+    std::swap(v1._isReadable, v2._isReadable);
+    std::swap(v1._isReadOnly, v2._isReadOnly);
+    std::swap(v1._isWritable, v2._isWritable);
 }
 
 
