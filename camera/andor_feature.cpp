@@ -692,6 +692,8 @@ ANDOR_FeatureInfo::ANDOR_FeatureInfo(ANDOR_FeatureInfo &&other):
 ANDOR_FeatureInfo & ANDOR_FeatureInfo::operator = (ANDOR_FeatureInfo other)
 {
     swap(*this, other);
+
+    return *this;
 }
 
 
