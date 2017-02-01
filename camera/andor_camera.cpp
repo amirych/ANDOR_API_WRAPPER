@@ -66,7 +66,7 @@ ANDOR_Camera::ANDOR_Feature ANDOR_Camera::SoftwareVersion(AT_HANDLE_SYSTEM,L"Sof
 ANDOR_Camera::ANDOR_Camera():
     logLevel(LOG_LEVEL_ERROR),
     lastError(AT_SUCCESS), cameraLog(nullptr), cameraHndl(AT_HANDLE_SYSTEM),
-    CameraPresent(L"CameraPresent"), CameraAcquiring(L"CameraAcquiring"), cameraFeature(),
+    cameraFeature(),
     waitBufferThread(),
     imageBufferAddr(nullptr), imageBuffersNumber(0),
     maxBuffersNumber(ANDOR_CAMERA_DEFAULT_MAX_BUFFERS_NUMBER), requestedBuffersNumber(0)
@@ -110,12 +110,8 @@ void ANDOR_Camera::setLogLevel(const LOG_LEVEL level)
            (&ANDOR_Camera::logToFile), this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3
                                     );
         cameraFeature.setLoggingFunc(log_func);
-        CameraPresent.setLoggingFunc(log_func);
-        CameraAcquiring.setLoggingFunc(log_func);
     } else { // reset logging function to null (no logging from SDK function calling)
         cameraFeature.setLoggingFunc();
-        CameraPresent.setLoggingFunc();
-        CameraAcquiring.setLoggingFunc();
     }
 
     std::string log_str = "Set logging level to ";
@@ -190,17 +186,11 @@ bool ANDOR_Camera::connectToCamera(const int device_index, std::ostream *log_fil
 
         andor_sdk_assert( AT_Open(device_index,&cameraHndl), log_str);
 
-        CameraPresent.setDeviceHndl(cameraHndl);
-        ok = CameraPresent;
-        if ( !ok ) { // it is very strange!!!
-            throw AndorSDK_Exception(AT_ERR_CONNECTION,"Connection lost!");
-        }
 
         log_str = "Connection established! Camera handler is " + std::to_string(cameraHndl);
         logToFile(ANDOR_Camera::CAMERA_INFO,log_str);
 
-        // initialize features (set working camera handler)
-        CameraAcquiring.setDeviceHndl(cameraHndl);
+        // initialize feature (set working camera handler)
         cameraFeature.setDeviceHndl(cameraHndl);
 
         logToFile(ANDOR_Camera::CAMERA_INFO,"Try to register 'CameraPresent'-feature callback function ...");
@@ -296,9 +286,6 @@ void ANDOR_Camera::disconnectFromCamera() // here there is no SDK error processi
 
     logToFile(ANDOR_Camera::CAMERA_INFO, "Try to disconnect from camera ...");
 
-    if ( CameraAcquiring ) {
-
-    }
 
     logToFile(ANDOR_Camera::CAMERA_INFO, "Unregistering 'CameraPresent'-feature callback function",1);
 
@@ -339,17 +326,6 @@ void ANDOR_Camera::acquisitionStart()
 {
     std::string log_msg;
 
-    if ( !CameraPresent ) {
-        log_msg = "Cannot start an acquisition! It seems camera is not connected or the connection was lost!";
-        logToFile(ANDOR_Camera::CAMERA_ERROR, log_msg);
-        return;
-    }
-
-    if ( CameraAcquiring ) { // !!!!!!  MAY NOT WORK WITH APOGEE CAMERAS! NEEDS CHECK!!!!
-        log_msg = "Cannot start an acquisition! Camera is still acquiring!";
-        logToFile(ANDOR_Camera::CAMERA_INFO, log_msg);
-        return;
-    }
 
     try {
         // compute number and allocate image buffers
@@ -618,7 +594,16 @@ void ANDOR_Camera::allocateImageBuffers(size_t imageSizeBytes)
     // allocate memory for image buffers (use of alignment required by SDK)
     char addr[20];
     for ( size_t i = 0; i < imageBuffersNumber; ++i ) {
+#ifdef _MSC_VER
+#if _MSC_VER > 1800
         alignas(8) unsigned char* pbuff = new unsigned char[imageSizeBytes];
+#else // compile with MSVC 13
+        __declspec(align(8))  unsigned char* pbuff = new unsigned char[imageSizeBytes];
+#endif
+#else
+        alignas(8) unsigned char* pbuff = new unsigned char[imageSizeBytes];
+#endif
+
         buff_ptr[i] = pbuff;
 
 #ifdef _MSC_VER

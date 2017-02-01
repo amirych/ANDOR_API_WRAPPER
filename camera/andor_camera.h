@@ -330,12 +330,6 @@ public:
     static ANDOR_Feature SoftwareVersion;
 
 
-            /* "CameraPresent" and "CameraAcquiring" feature declarations */
-
-    ANDOR_Feature CameraPresent;
-    ANDOR_Feature CameraAcquiring;
-
-
            /*  logging methods */
 
     void logToFile(const LOG_IDENTIFICATOR ident, const std::string &log_str, const int identation = 0); // general logging
