@@ -44,6 +44,7 @@ class NonNumericFeatureValue;
 struct ANDOR_StringFeature;
 struct ANDOR_EnumFeature;
 class ANDOR_EnumFeatureInfo;
+struct CallbackContext;
 
 
                     /************************************/
@@ -64,7 +65,14 @@ public:
     enum AndorFeatureType {UnknownType = -1, BoolType, IntType, FloatType, StringType, EnumType};
     enum CAMERA_IDENT_TAG {CameraModel, CameraName, SerialNumber, ControllerID};
 
+    // type for the valid SDK features list: map<"NAME","TYPE">
+
     typedef std::map<andor_string_t,AndorFeatureType> AndorFeatureNameMap;
+
+    // type for feature callback function ( it differs from SDK defintion!!!)
+    // such a definition allows use of class member as a callback function (see implementation of registerFeatureCallback method)
+
+    typedef std::function<int (andor_string_t, void*)> callback_func_t;
 
     explicit ANDOR_Camera();
 
@@ -230,7 +238,7 @@ protected:
 
 
     private:
-        operator andor_string_t();
+//        operator andor_string_t();
         AT_H deviceHndl;
         AT_WC* featureName;
         andor_string_t featureNameStr;
@@ -293,7 +301,6 @@ protected:
 
                 /*  END OF ANDOR_Feature CLASS DECLARATION  */
 
-
 public:
 
     void setLogLevel(const LOG_LEVEL level);
@@ -302,7 +309,8 @@ public:
     bool connectToCamera(const int device_index, std::ostream *log_file);
     bool connectToCamera(const ANDOR_Camera::CAMERA_IDENT_TAG ident_tag, const andor_string_t &tag_str, std::ostream *log_file);
     void disconnectFromCamera();
-
+    void registerFeatureCallback(andor_string_t feature_name, callback_func_t func, void *context);
+    void unregisterFeatureCallback(andor_string_t feature_name, callback_func_t func, void *context);
 
     virtual void acquisitionStart();
     virtual void acquisitionStop();
@@ -364,6 +372,9 @@ protected:
 
     void allocateImageBuffers(size_t imageSizeBytes);  // allocate image buffers
     void deleteImageBuffers();    // flush and delete image buffers
+
+
+    std::list<CallbackContext*> callbackContextPtr;
 
                 /*  static class members and methods  */
 
@@ -525,6 +536,12 @@ struct ANDOR_API_WRAPPER_EXPORT ANDOR_CameraInfo
     enum ANDOR_CameraInfoType {CameraModel, CameraName, SerialNumber, ControllerID};
 };
 
+
+// helper struct to pass user context into feature callback function
+struct CallbackContext {
+    ANDOR_Camera::callback_func_t func;
+    void *user_context;
+};
 
 
 #endif // ANDOR_CAMERA_H

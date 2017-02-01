@@ -33,20 +33,18 @@ static std::string time_stamp()
 }
 
 
-            /* CameraPresent feature callback function  */
+            /* feature callback function  */
 
-static int AT_EXP_CONV disconnection_callback(AT_H hndl, AT_WC* name, void* context)
+static int AT_EXP_CONV feature_callback(AT_H hndl, const AT_WC* name, void* context)
 {
     if ( context == nullptr ) return AT_ERR_INVALIDHANDLE; // just check (should not be NULL!!!)
 
-    ANDOR_Camera *camera = (ANDOR_Camera*)context;
-    if ( camera == nullptr ) return AT_ERR_INVALIDHANDLE; // just check
+    CallbackContext* _context = (CallbackContext*)context;
 
-    camera->disconnectFromCamera();
+    int ret_code = _context->func(andor_string_t(name),_context->user_context);
 
-    return AT_SUCCESS;
+    return ret_code;
 }
-
 
 
                 /*  STATIC MEMBERS INITIALIZATION   */
@@ -69,7 +67,8 @@ ANDOR_Camera::ANDOR_Camera():
     cameraFeature(),
     waitBufferThread(),
     imageBufferAddr(nullptr), imageBuffersNumber(0),
-    maxBuffersNumber(ANDOR_CAMERA_DEFAULT_MAX_BUFFERS_NUMBER), requestedBuffersNumber(0)
+    maxBuffersNumber(ANDOR_CAMERA_DEFAULT_MAX_BUFFERS_NUMBER), requestedBuffersNumber(0),
+    callbackContextPtr()
 {
     // camera handler for "CameraPresent"
     // and "CameraAcquiring" features will be
@@ -96,6 +95,11 @@ ANDOR_Camera::~ANDOR_Camera()
     }
 
     deleteImageBuffers();
+
+    // delete callback helper structures if it exist
+    if ( callbackContextPtr.size() ) {
+        for ( auto it = callbackContextPtr.begin(); it != callbackContextPtr.end(); ++it ) delete *it;
+    }
 }
 
 
@@ -193,18 +197,6 @@ bool ANDOR_Camera::connectToCamera(const int device_index, std::ostream *log_fil
         // initialize feature (set working camera handler)
         cameraFeature.setDeviceHndl(cameraHndl);
 
-        logToFile(ANDOR_Camera::CAMERA_INFO,"Try to register 'CameraPresent'-feature callback function ...");
-
-        log_str = "AT_RegisterFeatureCallback(" + std::to_string(cameraHndl) + ", L'CameraPresent', " +
-                  "(FeatureCallback)disconnection_callback,(void*)this";
-        if ( logLevel == LOG_LEVEL_VERBOSE ) logToFile(CAMERA_INFO,log_str);
-
-        andor_sdk_assert( AT_RegisterFeatureCallback(cameraHndl,L"CameraPresent",(FeatureCallback)disconnection_callback,(void*)this),
-                          log_str);
-
-        logToFile(ANDOR_Camera::CAMERA_INFO, "The callback function was registered successfully!");
-
-
         return true;
 
     } catch ( AndorSDK_Exception &ex) {
@@ -287,17 +279,6 @@ void ANDOR_Camera::disconnectFromCamera() // here there is no SDK error processi
     logToFile(ANDOR_Camera::CAMERA_INFO, "Try to disconnect from camera ...");
 
 
-    logToFile(ANDOR_Camera::CAMERA_INFO, "Unregistering 'CameraPresent'-feature callback function",1);
-
-    if ( logLevel == LOG_LEVEL_VERBOSE ) {
-        log_str = "AT_UnregisterFeatureCallback(" + std::to_string(cameraHndl) + ", L'CameraPresent', " +
-                  "(FeatureCallback)disconnection_callback), nullptr)";
-        logToFile(ANDOR_Camera::CAMERA_INFO,log_str);
-    }
-
-    AT_UnregisterFeatureCallback(cameraHndl,L"CameraPresent",(FeatureCallback)disconnection_callback,nullptr);
-
-
     if ( logLevel == LOG_LEVEL_VERBOSE ) {
         log_str = "AT_Close(" + std::to_string(cameraHndl) + ")";
         logToFile(ANDOR_Camera::CAMERA_INFO,log_str);
@@ -319,6 +300,88 @@ void ANDOR_Camera::setMaxBuffersNumber(const size_t num)
 size_t ANDOR_Camera::getMaxBuffersNumber() const
 {
     return maxBuffersNumber;
+}
+
+
+void ANDOR_Camera::registerFeatureCallback(andor_string_t feature_name, callback_func_t func, void *context)
+{
+    std::string log_str;
+
+    if ( cameraHndl == AT_HANDLE_SYSTEM ) {
+        throw AndorSDK_Exception(AT_ERR_CONNECTION, "Cannot register feature callback function! No connection to device!");
+    }
+
+    CallbackContext *_context = new CallbackContext();
+    callbackContextPtr.push_back(_context);
+
+    _context->func = func;
+    _context->user_context = context;
+
+    std::wstring_convert<std::codecvt_utf8<AT_WC>> cvt;
+    log_str = "Try to register '" + cvt.to_bytes(feature_name) +  "'-feature callback function ...";
+    logToFile(ANDOR_Camera::CAMERA_INFO, log_str);
+
+    // get string presentation of user callback function address
+    auto ff = *func.target<int (*)(andor_string_t, void*)>();
+    char addr[20];
+#ifdef _MSC_VER
+    int n = _snprintf(addr,20,"%p",ff);
+#else
+    int n = snprintf(addr,20,"%p",ff);
+#endif
+
+    log_str = "AT_RegisterFeatureCallback(" + std::to_string(cameraHndl) + ", L'" + cvt.to_bytes(feature_name).c_str() +
+            "', " + addr;
+
+#ifdef _MSC_VER
+    n = _snprintf(addr,20,"%p",context);
+#else
+    n = snprintf(addr,20,"%p",context);
+#endif
+    log_str += std::string(", ") + addr + ")";
+
+    if ( logLevel == LOG_LEVEL_VERBOSE ) logToFile(CAMERA_INFO,log_str);
+
+    andor_sdk_assert( AT_RegisterFeatureCallback(cameraHndl,feature_name.c_str(),feature_callback,(void*)_context),
+                      log_str);
+
+    logToFile(ANDOR_Camera::CAMERA_INFO, "The callback function was registered successfully!");
+
+}
+
+
+void ANDOR_Camera::unregisterFeatureCallback(andor_string_t feature_name, callback_func_t func, void *context)
+{
+    std::string log_str;
+
+    std::wstring_convert<std::codecvt_utf8<AT_WC>> cvt;
+    log_str = "Unregistering '" + cvt.to_bytes(feature_name) +  "'-feature callback function ...";
+    logToFile(ANDOR_Camera::CAMERA_INFO, log_str);
+
+    // get string presentation of user callback function address
+    auto ff = *func.target<int (*)(andor_string_t, void*)>();
+    char addr[20];
+#ifdef _MSC_VER
+    int n = _snprintf(addr,20,"%p",ff);
+#else
+    int n = snprintf(addr,20,"%p",ff);
+#endif
+
+    log_str = "AT_UnregisterFeatureCallback(" + std::to_string(cameraHndl) + ", L'" + cvt.to_bytes(feature_name).c_str() +
+            "', " + addr;
+
+#ifdef _MSC_VER
+    n = _snprintf(addr,20,"%p",context);
+#else
+    n = snprintf(addr,20,"%p",context);
+#endif
+    log_str += std::string(", ") + addr + ")";
+
+    if ( logLevel == LOG_LEVEL_VERBOSE ) logToFile(CAMERA_INFO,log_str);
+
+    andor_sdk_assert( AT_UnregisterFeatureCallback(cameraHndl,feature_name.c_str(),feature_callback,context), log_str);
+
+    logToFile(ANDOR_Camera::CAMERA_INFO, "The callback function was unregistered successfully!");
 }
 
 
@@ -517,6 +580,13 @@ int ANDOR_Camera::scanConnectedCameras()
 
     AT_H hndl;
 
+    ANDOR_FeatureInfo f_info;
+
+    std::list<andor_string_t> f_list = {L"CameraModel", L"CameraName", L"ControllerID",
+                                        L"SensorWidth",L"SensorHeight",
+                                        L"PixelWidth", L"PixelHeight",
+                                        L"InterfaceType"};
+
     if ( foundCameras.size() ) foundCameras.clear();
 
     // suppose device indices are continuous sequence from 0 to (DeviceCount-1)
@@ -526,7 +596,8 @@ int ANDOR_Camera::scanConnectedCameras()
             ANDOR_CameraInfo info;
             ANDOR_Feature feature(hndl,L"CameraModel");
 
-            info.cameraModel = feature;
+            f_info = feature;
+            if ( f_info.isImplemented() ) info.cameraModel = feature;
 
             feature.setName(L"CameraName");
             info.cameraName = feature;

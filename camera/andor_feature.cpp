@@ -156,21 +156,21 @@ ANDOR_Camera::ANDOR_Feature::operator ANDOR_EnumFeature()
                         /*  'get value' methods  */
 
 
-ANDOR_Camera::ANDOR_Feature::operator andor_string_t()
-{
-    switch ( featureType ) {
-        case ANDOR_Camera::StringType:
-            getString();
-            break;
-        case ANDOR_Camera::EnumType:
-            getEnumString();
-            break;
-        default:
-            throw AndorSDK_Exception(AT_ERR_NOTIMPLEMENTED,"Feature type missmatch!");
-    }
+//ANDOR_Camera::ANDOR_Feature::operator andor_string_t()
+//{
+//    switch ( featureType ) {
+//        case ANDOR_Camera::StringType:
+//            getString();
+//            break;
+//        case ANDOR_Camera::EnumType:
+//            getEnumString();
+//            break;
+//        default:
+//            throw AndorSDK_Exception(AT_ERR_NOTIMPLEMENTED,"Feature type missmatch!");
+//    }
 
-    return at_string;
-}
+//    return at_string;
+//}
 
 
 void ANDOR_Camera::ANDOR_Feature::getInt()
