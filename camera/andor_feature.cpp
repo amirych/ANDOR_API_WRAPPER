@@ -379,28 +379,28 @@ void ANDOR_Camera::ANDOR_Feature::getFeatureInfo(bool *is_impl, bool *is_read, b
 
     andor_sdk_assert( AT_IsImplemented(deviceHndl,featureName,&flag), log_msg);
 
-    *is_impl = flag;
+    *is_impl = flag == AT_TRUE ? true : false;
 
 
     formatLogMessage("AT_IsReadable","&flag");
 
     andor_sdk_assert( AT_IsReadable(deviceHndl,featureName,&flag), log_msg);
 
-    *is_read = flag;
+    *is_read = flag == AT_TRUE ? true : false;
 
 
     formatLogMessage("AT_IsReadOnly","&flag");
 
     andor_sdk_assert( AT_IsReadOnly(deviceHndl,featureName,&flag), log_msg);
 
-    *is_readonly = flag;
+    *is_readonly = flag == AT_TRUE ? true : false;
 
 
     formatLogMessage("AT_IsWritable","&flag");
 
     andor_sdk_assert( AT_IsWritable(deviceHndl,featureName,&flag), log_msg);
 
-    *is_write = flag;
+    *is_write = flag == AT_TRUE ? true : false;
 }
 
 

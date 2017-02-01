@@ -325,7 +325,7 @@ void ANDOR_Camera::registerFeatureCallback(andor_string_t feature_name, callback
     auto ff = *func.target<int (*)(andor_string_t, void*)>();
     char addr[20];
 #ifdef _MSC_VER
-    int n = _snprintf(addr,20,"%p",ff);
+    int n = _snprintf_s(addr,20,"%p",ff);
 #else
     int n = snprintf(addr,20,"%p",ff);
 #endif
@@ -334,7 +334,7 @@ void ANDOR_Camera::registerFeatureCallback(andor_string_t feature_name, callback
             "', " + addr;
 
 #ifdef _MSC_VER
-    n = _snprintf(addr,20,"%p",context);
+    n = _snprintf_s(addr,20,"%p",context);
 #else
     n = snprintf(addr,20,"%p",context);
 #endif
@@ -362,7 +362,7 @@ void ANDOR_Camera::unregisterFeatureCallback(andor_string_t feature_name, callba
     auto ff = *func.target<int (*)(andor_string_t, void*)>();
     char addr[20];
 #ifdef _MSC_VER
-    int n = _snprintf(addr,20,"%p",ff);
+    int n = _snprintf_s(addr,20,"%p",ff);
 #else
     int n = snprintf(addr,20,"%p",ff);
 #endif
@@ -371,7 +371,7 @@ void ANDOR_Camera::unregisterFeatureCallback(andor_string_t feature_name, callba
             "', " + addr;
 
 #ifdef _MSC_VER
-    n = _snprintf(addr,20,"%p",context);
+    n = _snprintf_s(addr,20,"%p",context);
 #else
     n = snprintf(addr,20,"%p",context);
 #endif
@@ -678,7 +678,7 @@ void ANDOR_Camera::allocateImageBuffers(size_t imageSizeBytes)
         buff_ptr[i] = pbuff;
 
 #ifdef _MSC_VER
-        int n = _snprintf(addr,20,"%p",buff_ptr[i]);
+        int n = _snprintf_s(addr,20,"%p",buff_ptr[i]);
 #else
         int n = snprintf(addr,20,"%p",buff_ptr[i]);
 #endif
@@ -705,7 +705,7 @@ void ANDOR_Camera::deleteImageBuffers()
         if ( logLevel == ANDOR_Camera::LOG_LEVEL_VERBOSE ) {
             char addr[20];
 #ifdef _MSC_VER
-            int n = _snprintf(addr,20,"%p",buff_ptr[i]);
+            int n = _snprintf_s(addr,20,"%p",buff_ptr[i]);
 #else
             int n = snprintf(addr,20,"%p",buff_ptr[i]);
 #endif
