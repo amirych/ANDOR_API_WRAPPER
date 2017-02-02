@@ -71,6 +71,7 @@ public:
 
     // type for feature callback function ( it differs from SDK defintion!!!)
     // such a definition allows use of class member as a callback function (see implementation of registerFeatureCallback method)
+    // the first arg is feature name, the second one is pointer to context
 
     typedef std::function<int (andor_string_t, void*)> callback_func_t;
 
@@ -309,8 +310,21 @@ public:
     bool connectToCamera(const int device_index, std::ostream *log_file);
     bool connectToCamera(const ANDOR_Camera::CAMERA_IDENT_TAG ident_tag, const andor_string_t &tag_str, std::ostream *log_file);
     void disconnectFromCamera();
-    void registerFeatureCallback(andor_string_t feature_name, callback_func_t func, void *context);
-    void unregisterFeatureCallback(andor_string_t feature_name, callback_func_t func, void *context);
+    void registerFeatureCallback(andor_string_t feature_name, const callback_func_t &func, void *context);
+    void unregisterFeatureCallback(andor_string_t feature_name, const callback_func_t &func, void *context);
+
+#ifdef _MSC_VER
+#if _MSC_VER > 1800
+    int waitBuffer(AT_U8** ptr, int *ptr_size, unsigned int timeout) noexcept;
+#else // to compile with VStudio 2013
+    int waitBuffer(AT_U8** ptr, int *ptr_size, unsigned int timeout);
+#endif
+#else
+    int waitBuffer(AT_U8** ptr, int *ptr_size, unsigned int timeout) noexcept;
+#endif
+
+    void queueBuffer(AT_U8* ptr, int ptr_size);
+    void flush();
 
     virtual void acquisitionStart();
     virtual void acquisitionStop();
@@ -370,7 +384,7 @@ protected:
     size_t maxBuffersNumber;
     size_t requestedBuffersNumber;
 
-    void allocateImageBuffers(size_t imageSizeBytes);  // allocate image buffers
+    void allocateImageBuffers(int imageSizeBytes);  // allocate image buffers
     void deleteImageBuffers();    // flush and delete image buffers
 
 

@@ -24,7 +24,7 @@ static andor_string_t trim_str(const andor_string_t &str)
 
 
 ANDOR_Camera::ANDOR_Feature::ANDOR_Feature():
-    deviceHndl(AT_HANDLE_SYSTEM), featureName(nullptr), featureNameStr(andor_string_t()),
+    deviceHndl(AT_HANDLE_UNINITIALISED), featureName(nullptr), featureNameStr(andor_string_t()),
     featureType(UnknownType), logMessageStream(), loggingFunc(nullptr), at_string()
 {
 

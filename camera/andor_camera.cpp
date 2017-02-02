@@ -17,6 +17,18 @@ extern ANDOR_Camera::AndorFeatureNameMap  DEFAULT_ANDOR_SDK_FEATURES; // pre-def
 
                 /*  AUXILIARY NON-MEMBER FUNCTIONS  */
 
+static inline std::string pointer_to_str(void* ptr)
+{
+    char addr[20];
+#ifdef _MSC_VER
+    int n = _snprintf_s(addr,20,"%p",ptr);
+#else
+    int n = snprintf(addr,20,"%p",ptr);
+#endif
+    return std::string(addr);
+}
+
+
 static std::string time_stamp()
 {
     auto now = std::chrono::system_clock::now();
@@ -63,7 +75,7 @@ ANDOR_Camera::ANDOR_Feature ANDOR_Camera::SoftwareVersion(AT_HANDLE_SYSTEM,L"Sof
 
 ANDOR_Camera::ANDOR_Camera():
     logLevel(LOG_LEVEL_ERROR),
-    lastError(AT_SUCCESS), cameraLog(nullptr), cameraHndl(AT_HANDLE_SYSTEM),
+    lastError(AT_SUCCESS), cameraLog(nullptr), cameraHndl(AT_HANDLE_UNINITIALISED),
     cameraFeature(),
     waitBufferThread(),
     imageBufferAddr(nullptr), imageBuffersNumber(0),
@@ -170,7 +182,7 @@ bool ANDOR_Camera::connectToCamera(const int device_index, std::ostream *log_fil
     try {
         int dev_num = ANDOR_Camera::DeviceCount;
         if ( logLevel == ANDOR_Camera::LOG_LEVEL_VERBOSE ) {
-
+            logToFile(ANDOR_Camera::CAMERA_INFO, DeviceCount.getLastLogMessage());
         }
 
         log_str = "Number of found cameras: " + std::to_string(dev_num);
@@ -276,6 +288,8 @@ void ANDOR_Camera::disconnectFromCamera() // here there is no SDK error processi
 {
     std::string log_str;
 
+    if ( cameraHndl == AT_HANDLE_UNINITIALISED ) return;
+
     logToFile(ANDOR_Camera::CAMERA_INFO, "Try to disconnect from camera ...");
 
 
@@ -284,9 +298,11 @@ void ANDOR_Camera::disconnectFromCamera() // here there is no SDK error processi
         logToFile(ANDOR_Camera::CAMERA_INFO,log_str);
     }
 
-    AT_Close(cameraHndl);
+    lastError = AT_Close(cameraHndl);
 
     logToFile(ANDOR_Camera::CAMERA_INFO,"Camera disconnected");
+
+    cameraHndl = AT_HANDLE_UNINITIALISED;
 }
 
 
@@ -303,11 +319,11 @@ size_t ANDOR_Camera::getMaxBuffersNumber() const
 }
 
 
-void ANDOR_Camera::registerFeatureCallback(andor_string_t feature_name, callback_func_t func, void *context)
+void ANDOR_Camera::registerFeatureCallback(andor_string_t feature_name, const callback_func_t &func, void *context)
 {
     std::string log_str;
 
-    if ( cameraHndl == AT_HANDLE_SYSTEM ) {
+    if ( cameraHndl == AT_HANDLE_UNINITIALISED ) {
         throw AndorSDK_Exception(AT_ERR_CONNECTION, "Cannot register feature callback function! No connection to device!");
     }
 
@@ -323,26 +339,30 @@ void ANDOR_Camera::registerFeatureCallback(andor_string_t feature_name, callback
 
     // get string presentation of user callback function address
     auto ff = *func.target<int (*)(andor_string_t, void*)>();
-    char addr[20];
-#ifdef _MSC_VER
-    int n = _snprintf_s(addr,20,"%p",ff);
-#else
-    int n = snprintf(addr,20,"%p",ff);
-#endif
+    std::string sptr = pointer_to_str((void*)ff);
+//    char addr[20];
+//#ifdef _MSC_VER
+//    int n = _snprintf_s(addr,20,"%p",ff);
+//#else
+//    int n = snprintf(addr,20,"%p",ff);
+//#endif
 
     log_str = "AT_RegisterFeatureCallback(" + std::to_string(cameraHndl) + ", L'" + cvt.to_bytes(feature_name).c_str() +
-            "', " + addr;
+            "', " + sptr;
+//            "', " + addr;
 
-#ifdef _MSC_VER
-    n = _snprintf_s(addr,20,"%p",context);
-#else
-    n = snprintf(addr,20,"%p",context);
-#endif
-    log_str += std::string(", ") + addr + ")";
+//#ifdef _MSC_VER
+//    n = _snprintf_s(addr,20,"%p",context);
+//#else
+//    n = snprintf(addr,20,"%p",context);
+//#endif
+//    log_str += std::string(", ") + addr + ")";
+
+    log_str += std::string(", ") + pointer_to_str(context) + ")";
 
     if ( logLevel == LOG_LEVEL_VERBOSE ) logToFile(CAMERA_INFO,log_str);
 
-    andor_sdk_assert( AT_RegisterFeatureCallback(cameraHndl,feature_name.c_str(),feature_callback,(void*)_context),
+    andor_sdk_assert( lastError = AT_RegisterFeatureCallback(cameraHndl,feature_name.c_str(),feature_callback,(void*)_context),
                       log_str);
 
     logToFile(ANDOR_Camera::CAMERA_INFO, "The callback function was registered successfully!");
@@ -350,9 +370,13 @@ void ANDOR_Camera::registerFeatureCallback(andor_string_t feature_name, callback
 }
 
 
-void ANDOR_Camera::unregisterFeatureCallback(andor_string_t feature_name, callback_func_t func, void *context)
+void ANDOR_Camera::unregisterFeatureCallback(andor_string_t feature_name, const callback_func_t &func, void *context)
 {
     std::string log_str;
+
+    if ( cameraHndl == AT_HANDLE_UNINITIALISED ) { // not sure it is a good idea!!!
+        return;
+    }
 
     std::wstring_convert<std::codecvt_utf8<AT_WC>> cvt;
     log_str = "Unregistering '" + cvt.to_bytes(feature_name) +  "'-feature callback function ...";
@@ -360,28 +384,75 @@ void ANDOR_Camera::unregisterFeatureCallback(andor_string_t feature_name, callba
 
     // get string presentation of user callback function address
     auto ff = *func.target<int (*)(andor_string_t, void*)>();
-    char addr[20];
-#ifdef _MSC_VER
-    int n = _snprintf_s(addr,20,"%p",ff);
-#else
-    int n = snprintf(addr,20,"%p",ff);
-#endif
+    std::string sptr = pointer_to_str((void*)ff);
+//    char addr[20];
+//#ifdef _MSC_VER
+//    int n = _snprintf_s(addr,20,"%p",ff);
+//#else
+//    int n = snprintf(addr,20,"%p",ff);
+//#endif
 
     log_str = "AT_UnregisterFeatureCallback(" + std::to_string(cameraHndl) + ", L'" + cvt.to_bytes(feature_name).c_str() +
-            "', " + addr;
+            "', " + sptr;
+//            "', " + addr;
 
-#ifdef _MSC_VER
-    n = _snprintf_s(addr,20,"%p",context);
-#else
-    n = snprintf(addr,20,"%p",context);
-#endif
-    log_str += std::string(", ") + addr + ")";
+//#ifdef _MSC_VER
+//    n = _snprintf_s(addr,20,"%p",context);
+//#else
+//    n = snprintf(addr,20,"%p",context);
+//#endif
+//    log_str += std::string(", ") + addr + ")";
+    log_str += std::string(", ") + pointer_to_str(context) + ")";
 
     if ( logLevel == LOG_LEVEL_VERBOSE ) logToFile(CAMERA_INFO,log_str);
 
-    andor_sdk_assert( AT_UnregisterFeatureCallback(cameraHndl,feature_name.c_str(),feature_callback,context), log_str);
+    andor_sdk_assert( lastError = AT_UnregisterFeatureCallback(cameraHndl,feature_name.c_str(),feature_callback,context), log_str);
 
     logToFile(ANDOR_Camera::CAMERA_INFO, "The callback function was unregistered successfully!");
+}
+
+
+#ifdef _MSC_VER
+#if _MSC_VER > 1800
+int ANDOR_Camera::waitBuffer(AT_U8 **ptr, int *ptr_size, unsigned int timeout) noexcept
+#else
+int ANDOR_Camera::waitBuffer(AT_U8 **ptr, int *ptr_size, unsigned int timeout)
+#endif
+#else
+int ANDOR_Camera::waitBuffer(AT_U8 **ptr, int *ptr_size, unsigned int timeout) noexcept
+#endif
+{
+    std::string log_str;
+
+    log_str = "AT_WaitBuffer(" + std::to_string(cameraHndl) + ", **ptr, *ptr_size, " + std::to_string(timeout);
+    if ( logLevel == LOG_LEVEL_VERBOSE ) logToFile(CAMERA_INFO,log_str);
+
+    int ret_code = AT_WaitBuffer(cameraHndl, ptr, ptr_size, timeout);
+//    andor_sdk_assert( ret_code, log_str);
+
+    log_str = "returns: *ptr = " + pointer_to_str(*ptr) + ", ptr_size = " + std::to_string(*ptr_size);
+    if ( logLevel == LOG_LEVEL_VERBOSE ) logToFile(CAMERA_INFO,log_str,1);
+
+    return ret_code;
+}
+
+
+void ANDOR_Camera::queueBuffer(AT_U8 *ptr, int ptr_size)
+{
+    std::string log_msg = "AT_QueueBuffer(" + std::to_string(cameraHndl) + ", " + pointer_to_str(ptr) +
+                          ", " + std::to_string(ptr_size) + ")";
+    if ( logLevel == ANDOR_Camera::LOG_LEVEL_VERBOSE ) logToFile(ANDOR_Camera::CAMERA_INFO, log_msg);
+
+    andor_sdk_assert( lastError =  AT_QueueBuffer(cameraHndl, ptr, ptr_size), log_msg);
+}
+
+
+void ANDOR_Camera::flush()
+{
+    std::string log_str = "AT_Flush(" + std::to_string(cameraHndl) + ")";
+    if ( logLevel == ANDOR_Camera::LOG_LEVEL_VERBOSE ) logToFile(ANDOR_Camera::CAMERA_INFO,log_str);
+
+    andor_sdk_assert( lastError = AT_Flush(cameraHndl), log_str );
 }
 
 
@@ -642,7 +713,7 @@ void ANDOR_Camera::logToFile(const ANDOR_Feature &feature, const int identation)
 }
 
 
-void ANDOR_Camera::allocateImageBuffers(size_t imageSizeBytes)
+void ANDOR_Camera::allocateImageBuffers(int imageSizeBytes)
 {
     std::string log_msg;
 
@@ -663,12 +734,12 @@ void ANDOR_Camera::allocateImageBuffers(size_t imageSizeBytes)
     }
 
     // allocate memory for image buffers (use of alignment required by SDK)
-    char addr[20];
+//    char addr[20];
     for ( size_t i = 0; i < imageBuffersNumber; ++i ) {
 #ifdef _MSC_VER
 #if _MSC_VER > 1800
         alignas(8) unsigned char* pbuff = new unsigned char[imageSizeBytes];
-#else // compile with MSVC 13
+#else // compile with VS 2013
         __declspec(align(8))  unsigned char* pbuff = new unsigned char[imageSizeBytes];
 #endif
 #else
@@ -677,15 +748,13 @@ void ANDOR_Camera::allocateImageBuffers(size_t imageSizeBytes)
 
         buff_ptr[i] = pbuff;
 
-#ifdef _MSC_VER
-        int n = _snprintf_s(addr,20,"%p",buff_ptr[i]);
-#else
-        int n = snprintf(addr,20,"%p",buff_ptr[i]);
-#endif
-        log_msg = "AT_QueueBuffer(" + std::to_string(cameraHndl) + ", " + addr + ", " + std::to_string(imageSizeBytes) + ")";
-        if ( logLevel == ANDOR_Camera::LOG_LEVEL_VERBOSE ) logToFile(ANDOR_Camera::CAMERA_INFO, log_msg);
-
-        andor_sdk_assert( AT_QueueBuffer(cameraHndl, buff_ptr[i], imageSizeBytes), log_msg);
+//#ifdef _MSC_VER
+//        int n = _snprintf_s(addr,20,"%p",buff_ptr[i]);
+//#else
+//        int n = snprintf(addr,20,"%p",buff_ptr[i]);
+//#endif
+//        log_msg = "AT_QueueBuffer(" + std::to_string(cameraHndl) + ", " + addr + ", " + std::to_string(imageSizeBytes) + ")";
+        queueBuffer(buff_ptr[i], imageSizeBytes);
     }
 }
 
@@ -694,22 +763,22 @@ void ANDOR_Camera::deleteImageBuffers()
 {
     if ( !imageBufferAddr ) return;
 
-    std::string log_str = "AT_Flush(" + std::to_string(cameraHndl) + ")";
-    if ( logLevel == ANDOR_Camera::LOG_LEVEL_VERBOSE ) logToFile(ANDOR_Camera::CAMERA_INFO,log_str);
+    std::string log_str;
 
-    andor_sdk_assert( AT_Flush(cameraHndl), log_str );
+    flush();
 
     unsigned char** buff_ptr = imageBufferAddr.get();
 
     for ( size_t i = 0; i < imageBuffersNumber; ++i ) {
         if ( logLevel == ANDOR_Camera::LOG_LEVEL_VERBOSE ) {
-            char addr[20];
-#ifdef _MSC_VER
-            int n = _snprintf_s(addr,20,"%p",buff_ptr[i]);
-#else
-            int n = snprintf(addr,20,"%p",buff_ptr[i]);
-#endif
-            log_str = std::string("Delete image buffer at address: ") + addr;
+//            char addr[20];
+//#ifdef _MSC_VER
+//            int n = _snprintf_s(addr,20,"%p",buff_ptr[i]);
+//#else
+//            int n = snprintf(addr,20,"%p",buff_ptr[i]);
+//#endif
+//            log_str = std::string("Delete image buffer at address: ") + addr;
+            log_str = std::string("Delete image buffer at address: ") + pointer_to_str(buff_ptr[i]);
             logToFile(ANDOR_Camera::CAMERA_INFO,log_str,1);
         }
         delete[] buff_ptr[i];
