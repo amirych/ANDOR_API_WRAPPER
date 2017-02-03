@@ -49,6 +49,8 @@ struct CallbackContext;
 
                     /************************************/
                     /*  ANDOR CAMERA CLASS DECLARATION  */
+                    /*                                  */
+                    /*   A GENERIC C++ WRAPPER FOR SDK  */
                     /************************************/
 
 class ANDOR_API_WRAPPER_EXPORT ANDOR_Camera
@@ -326,8 +328,8 @@ public:
     void queueBuffer(AT_U8* ptr, int ptr_size);
     void flush();
 
-    virtual void acquisitionStart();
-    virtual void acquisitionStop();
+    virtual void acquisitionStart(){}
+    virtual void acquisitionStop(){}
 
     void setMaxBuffersNumber(const size_t num);
     size_t getMaxBuffersNumber() const;
@@ -350,6 +352,8 @@ public:
 
     static ANDOR_Feature DeviceCount;
     static ANDOR_Feature SoftwareVersion;
+//    ANDOR_Feature DeviceCount;
+//    ANDOR_Feature SoftwareVersion;
 
 
            /*  logging methods */
@@ -378,14 +382,18 @@ protected:
 
     void waitBufferFunc();
 
-    std::unique_ptr<unsigned char*> imageBufferAddr;
-    size_t imageBuffersNumber;
+//    std::unique_ptr<unsigned char*> imageBufferAddr;
+//    size_t imageBuffersNumber;
+
+    // vector of pointers to image buffers
+    std::vector<std::unique_ptr<AT_U8[]>> imageBufferAddr;
+    size_t imageBufferSize;
 
     size_t maxBuffersNumber;
     size_t requestedBuffersNumber;
 
     void allocateImageBuffers(int imageSizeBytes);  // allocate image buffers
-    void deleteImageBuffers();    // flush and delete image buffers
+//    void deleteImageBuffers();    // flush and delete image buffers
 
 
     std::list<CallbackContext*> callbackContextPtr;
@@ -396,7 +404,8 @@ protected:
     static std::list<int> openedCameraIndices;
     static size_t numberOfCreatedObjects;
 
-    static AndorFeatureNameMap ANDOR_SDK_FEATURES;
+//    static AndorFeatureNameMap ANDOR_SDK_FEATURES;
+    AndorFeatureNameMap ANDOR_SDK_FEATURES;
 
     static int scanConnectedCameras(); // scan connected cameras when the first object will be created
 

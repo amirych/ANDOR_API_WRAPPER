@@ -176,7 +176,7 @@ ANDOR_Camera::ANDOR_Feature::operator ANDOR_EnumFeature()
 void ANDOR_Camera::ANDOR_Feature::getInt()
 {
     if ( featureType != ANDOR_Camera::IntType ) {
-        throw AndorSDK_Exception(AT_ERR_NOTIMPLEMENTED,"Feature type missmatch!");
+        throw AndorSDK_Exception(AT_ERR_NOTIMPLEMENTED,"Feature type missmatch>>>!");
     }
 
     formatLogMessage("AT_GetInt","&at64_val");
@@ -604,7 +604,9 @@ void ANDOR_Camera::ANDOR_Feature::formatLogMessage(const std::string &sdk_func, 
     logMessageStream.str("");  // clear string stream
     logMessageStream << sdk_func << "(";  // print SDK function name
     logHelper(featureNameStr); // print feature name
+    logMessageStream << ", ";
     logHelper(deviceHndl);     // print device handler
+    logMessageStream << ", ";
     logHelper(args ...);       // print function arguments
     logMessageStream << ")";
 
