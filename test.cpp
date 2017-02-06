@@ -6,7 +6,10 @@
 int main()
 {
     ANDOR_Camera cam;
+    ANDOR_StringFeature ef;
     try {
+        ef = ANDOR_Camera::SoftwareVersion;
+        std::cout << "Software version: " + ef.value_to_string() << std::endl;
         cam.setLogLevel(ANDOR_Camera::LOG_LEVEL_VERBOSE);
 
 
@@ -14,7 +17,7 @@ int main()
         std::cout << "Is openned: " << ok << "\n";
         if ( ok ) {
             cam["FanSpeed"] = L"Off";
-            ANDOR_StringFeature ef = cam["InterfaceType"];
+            ef = cam["InterfaceType"];
 
             std::cout << "InterfaceType = " << ef.value_to_string() << "\n";
         }

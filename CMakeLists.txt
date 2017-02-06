@@ -3,6 +3,8 @@ cmake_minimum_required(VERSION 2.8)
 
 set(CMAKE_CXX_STANDARD 11)
 
+set(CMAKE_BUILD_TYPE "Debug")
+
 set (ANDOR_CAMERA_VERSION_MAJOR 0)
 set (ANDOR_CAMERA_VERSION_MINOR 1)
 

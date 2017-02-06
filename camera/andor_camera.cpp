@@ -106,17 +106,12 @@ ANDOR_Camera::ANDOR_Camera():
     // set in connectToCamera method as at this point there is still no camera handle!!!
 
     if ( !numberOfCreatedObjects ) {
-        AT_InitialiseLibrary();
+        lastError = AT_InitialiseLibrary();
+        if ( lastError != AT_SUCCESS ) return;
 //        scanConnectedCameras();
     }
 
     setLogLevel(logLevel); // needed to initialize or disable extra logging facility
-
-//    DeviceCount.setDeviceHndl(AT_HANDLE_SYSTEM);
-//    DeviceCount.setName(L"DeviceCount");
-
-//    SoftwareVersion.setDeviceHndl(AT_HANDLE_SYSTEM);
-//    SoftwareVersion.setName(L"Softwareversion");
 
     ANDOR_Camera::DeviceCount.setType(ANDOR_Camera::IntType);
     ANDOR_Camera::SoftwareVersion.setType(ANDOR_Camera::StringType);
@@ -190,6 +185,12 @@ ANDOR_Camera::LOG_LEVEL ANDOR_Camera::getLogLevel() const
 
 bool ANDOR_Camera::connectToCamera(const int device_index, std::ostream *log_file)
 {
+    if ( lastError != AT_SUCCESS ) { // check error from constructor (ANDOR SDK may not be initialized)!!!
+        logToFile(ANDOR_Camera::CAMERA_ERROR, "IT SEEMS ANDOR SDK WAS NOT INITIALIZED!!! CANNOT OPEN A CONNECTION!!!");
+        logToFile(ANDOR_Camera::CAMERA_ERROR, "LAST SDK FUNCTION CALLING RETURNS ERROR CODE: " + std::to_string(lastError));
+        return false;
+    }
+
     disconnectFromCamera();
 
     cameraLog = log_file;
@@ -199,7 +200,9 @@ bool ANDOR_Camera::connectToCamera(const int device_index, std::ostream *log_fil
     std::string log_str;
     log_str.resize(80,'*');
     logToFile(ANDOR_Camera::BLANK,log_str);
-    logToFile(ANDOR_Camera::BLANK,"                 " + time_stamp());
+    std::string blank;
+    blank.resize(time_stamp().length()+4,' ');
+    logToFile(ANDOR_Camera::BLANK,blank + time_stamp());
     logToFile(ANDOR_Camera::BLANK,log_str);
 
     logToFile(ANDOR_Camera::CAMERA_INFO,"Try to open a connection to Andor camera ... ");
