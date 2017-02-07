@@ -228,7 +228,6 @@ void ANDOR_Camera::ANDOR_Feature::getString()
     if ( len ) {
         AT_WC* str;
         try {
-//            AT_WC str[len]; // not allowed in VS, only GCC
             str = new AT_WC[len];
         } catch (std::bad_alloc &ex ) {
             throw AndorSDK_Exception(AT_ERR_NOMEMORY, "Can not allocate memory for AT_WC* string!");

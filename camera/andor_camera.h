@@ -132,7 +132,6 @@ protected:
         template<typename T, typename = typename std::enable_if<std::is_arithmetic<T>::value>::type>
         operator T()
         {
-//            static T ret_val;
             T ret_val;
             switch ( featureType ) {
                 case ANDOR_Camera::IntType: {
@@ -172,7 +171,6 @@ protected:
         template<typename T, typename = typename std::enable_if<std::is_arithmetic<T>::value>::type>
         operator std::pair<T,T>()
         {
-//            static std::pair<T,T> ret_val;
             std::pair<T,T> ret_val;
 
             switch ( featureType ) {
@@ -234,14 +232,11 @@ protected:
             return *this;
         }
 
-//        ANDOR_Feature & operator = (const ANDOR_StringFeature &val);
-//        ANDOR_Feature & operator = (const ANDOR_EnumFeature &val);
         ANDOR_Feature &  operator = (const andor_string_t &val);
         ANDOR_Feature &  operator = (const AT_WC *val);
 
 
     private:
-//        operator andor_string_t();
         AT_H deviceHndl;
         AT_WC* featureName;
         andor_string_t featureNameStr;
@@ -352,9 +347,8 @@ public:
 
     static ANDOR_Feature DeviceCount;
     static ANDOR_Feature SoftwareVersion;
-//    ANDOR_Feature DeviceCount;
-//    ANDOR_Feature SoftwareVersion;
 
+    static std::list<ANDOR_CameraInfo> getFoundCameras() {return foundCameras;};
 
            /*  logging methods */
 
@@ -382,9 +376,6 @@ protected:
 
     void waitBufferFunc();
 
-//    std::unique_ptr<unsigned char*> imageBufferAddr;
-//    size_t imageBuffersNumber;
-
     // vector of pointers to image buffers
     std::vector<std::unique_ptr<AT_U8[]>> imageBufferAddr;
     size_t imageBufferSize;
@@ -393,7 +384,6 @@ protected:
     size_t requestedBuffersNumber;
 
     void allocateImageBuffers(int imageSizeBytes);  // allocate image buffers
-//    void deleteImageBuffers();    // flush and delete image buffers
 
 
     std::list<CallbackContext*> callbackContextPtr;
@@ -552,7 +542,6 @@ struct ANDOR_API_WRAPPER_EXPORT ANDOR_CameraInfo
     AT_64 sensorHeight;
     double pixelWidth; // in micrometers
     double pixelHeight;
-//    andor_string_t interfaceType;
     ANDOR_StringFeature interfaceType;
     int device_index;
 

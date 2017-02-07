@@ -94,24 +94,23 @@ ANDOR_Camera::ANDOR_Camera():
     lastError(AT_SUCCESS), cameraLog(nullptr), cameraHndl(AT_HANDLE_UNINITIALISED),
     cameraFeature(),
     waitBufferThread(),
-//    imageBufferAddr(nullptr), imageBuffersNumber(0),
     imageBufferAddr(),
     maxBuffersNumber(ANDOR_CAMERA_DEFAULT_MAX_BUFFERS_NUMBER), requestedBuffersNumber(0),
     callbackContextPtr(),
-//    DeviceCount(), SoftwareVersion(),
     ANDOR_SDK_FEATURES(DEFAULT_ANDOR_SDK_FEATURES)
 {
     // camera handler for "CameraPresent"
     // and "CameraAcquiring" features will be
     // set in connectToCamera method as at this point there is still no camera handle!!!
 
+    setLogLevel(logLevel); // needed to initialize or disable extra logging facility
+
     if ( !numberOfCreatedObjects ) {
         lastError = AT_InitialiseLibrary();
         if ( lastError != AT_SUCCESS ) return;
-//        scanConnectedCameras();
+        scanConnectedCameras();
     }
 
-    setLogLevel(logLevel); // needed to initialize or disable extra logging facility
 
     ANDOR_Camera::DeviceCount.setType(ANDOR_Camera::IntType);
     ANDOR_Camera::SoftwareVersion.setType(ANDOR_Camera::StringType);
@@ -129,7 +128,6 @@ ANDOR_Camera::~ANDOR_Camera()
         AT_FinaliseLibrary();
     }
 
-//    deleteImageBuffers();
 
     // delete callback helper structures if it exist
     if ( callbackContextPtr.size() ) {
@@ -283,16 +281,19 @@ bool ANDOR_Camera::connectToCamera(const ANDOR_Camera::CAMERA_IDENT_TAG ident_ta
     for ( ANDOR_CameraInfo info: foundCameras ) {
         switch (ident_tag) {
             case ANDOR_Camera::CameraModel:
-//                ok = info.cameraModel.compare(tag_str);
+                if ( info.cameraModel.value().empty() ) break;
                 ok = info.cameraModel.value().compare(tag_str);
                 break;
             case ANDOR_Camera::CameraName:
+                if ( info.cameraName.value().empty() ) break;
                 ok = info.cameraName.value().compare(tag_str);
                 break;
             case ANDOR_Camera::SerialNumber:
+                if ( info.serialNumber.value().empty() ) break;
                 ok = info.serialNumber.value().compare(tag_str);
                 break;
             case ANDOR_Camera::ControllerID:
+                if ( info.controllerID.value().empty() ) break;
                 ok = info.controllerID.value().compare(tag_str);
                 break;
         }
@@ -371,23 +372,9 @@ void ANDOR_Camera::registerFeatureCallback(andor_string_t feature_name, const ca
     // get string presentation of user callback function address
     auto ff = *func.target<int (*)(andor_string_t, void*)>();
     std::string sptr = pointer_to_str((void*)ff);
-//    char addr[20];
-//#ifdef _MSC_VER
-//    int n = _snprintf_s(addr,20,"%p",ff);
-//#else
-//    int n = snprintf(addr,20,"%p",ff);
-//#endif
 
     log_str = "AT_RegisterFeatureCallback(" + std::to_string(cameraHndl) + ", L'" + cvt.to_bytes(feature_name).c_str() +
             "', " + sptr;
-//            "', " + addr;
-
-//#ifdef _MSC_VER
-//    n = _snprintf_s(addr,20,"%p",context);
-//#else
-//    n = snprintf(addr,20,"%p",context);
-//#endif
-//    log_str += std::string(", ") + addr + ")";
 
     log_str += std::string(", ") + pointer_to_str(context) + ")";
 
@@ -416,23 +403,9 @@ void ANDOR_Camera::unregisterFeatureCallback(andor_string_t feature_name, const 
     // get string presentation of user callback function address
     auto ff = *func.target<int (*)(andor_string_t, void*)>();
     std::string sptr = pointer_to_str((void*)ff);
-//    char addr[20];
-//#ifdef _MSC_VER
-//    int n = _snprintf_s(addr,20,"%p",ff);
-//#else
-//    int n = snprintf(addr,20,"%p",ff);
-//#endif
 
     log_str = "AT_UnregisterFeatureCallback(" + std::to_string(cameraHndl) + ", L'" + cvt.to_bytes(feature_name).c_str() +
             "', " + sptr;
-//            "', " + addr;
-
-//#ifdef _MSC_VER
-//    n = _snprintf_s(addr,20,"%p",context);
-//#else
-//    n = snprintf(addr,20,"%p",context);
-//#endif
-//    log_str += std::string(", ") + addr + ")";
     log_str += std::string(", ") + pointer_to_str(context) + ")";
 
     if ( logLevel == LOG_LEVEL_VERBOSE ) logToFile(CAMERA_INFO,log_str);
@@ -639,46 +612,52 @@ int ANDOR_Camera::scanConnectedCameras()
 
     ANDOR_FeatureInfo f_info;
 
-    std::list<andor_string_t> f_list = {L"CameraModel", L"CameraName", L"ControllerID",
-                                        L"SensorWidth",L"SensorHeight",
-                                        L"PixelWidth", L"PixelHeight",
-                                        L"InterfaceType"};
-
     if ( foundCameras.size() ) foundCameras.clear();
 
     // suppose device indices are continuous sequence from 0 to (DeviceCount-1)
     for (int i = 0; i < N-1; ++i ) {
         int err = AT_Open(i,&hndl);
         if ( err == AT_SUCCESS ) {
-            ANDOR_CameraInfo info;
+            ANDOR_CameraInfo info;            
             ANDOR_Feature feature(hndl,L"CameraModel");
+            feature.setType(ANDOR_Camera::StringType);
 
             f_info = feature;
             if ( f_info.isImplemented() ) info.cameraModel = feature;
 
             feature.setName(L"CameraName");
-            info.cameraName = feature;
+            f_info = feature;
+            if ( f_info.isImplemented() ) info.cameraName = feature;
 
             feature.setName(L"SerialNumber");
-            info.serialNumber = feature;
+            f_info = feature;
+            if ( f_info.isImplemented() ) info.serialNumber = feature;
 
             feature.setName(L"ControllerID");
-            info.controllerID = feature;
-
-            feature.setName(L"SensorWidth");
-            info.sensorWidth = feature;
-
-            feature.setName(L"SensorHeight");
-            info.sensorHeight = feature;
-
-            feature.setName(L"PixelWidth");
-            info.pixelWidth = feature;
-
-            feature.setName(L"PixelHeight");
-            info.pixelHeight = feature;
+            f_info = feature;
+            if ( f_info.isImplemented() ) info.controllerID = feature;
 
             feature.setName(L"InterfaceType");
-            info.interfaceType = feature;
+            f_info = feature;
+            if ( f_info.isImplemented() ) info.interfaceType = feature;
+
+            feature.setName(L"SensorWidth");
+            feature.setType(ANDOR_Camera::IntType);
+            f_info = feature;
+            if ( f_info.isImplemented() ) info.sensorWidth = feature;
+
+            feature.setName(L"SensorHeight");
+            f_info = feature;
+            if ( f_info.isImplemented() ) info.sensorHeight = feature;
+
+            feature.setName(L"PixelWidth");
+            feature.setType(ANDOR_Camera::FloatType);
+            f_info = feature;
+            if ( f_info.isImplemented() ) info.pixelWidth = feature;
+
+            feature.setName(L"PixelHeight");
+            f_info = feature;
+            if ( f_info.isImplemented() ) info.pixelHeight = feature;
 
             info.device_index = i;
 
@@ -708,10 +687,8 @@ void ANDOR_Camera::allocateImageBuffers(int imageSizeBytes)
         throw AndorSDK_Exception(AT_ERR_NOMEMORY, log_msg);
     }
 
-//    imageBuffersNumber = ( requestedBuffersNumber > maxBuffersNumber ) ? maxBuffersNumber : requestedBuffersNumber;
     size_t imageBuffersNumber = ( requestedBuffersNumber > maxBuffersNumber ) ? maxBuffersNumber : requestedBuffersNumber;
 
-//    imageBufferAddr = std::unique_ptr<unsigned char*>(new unsigned char*[imageBuffersNumber]);
 
     // try to optimize allocation mechanism: real allocation only if it is needed
     if ( imageBufferAddr.size() != imageBuffersNumber ) {
@@ -735,52 +712,8 @@ void ANDOR_Camera::allocateImageBuffers(int imageSizeBytes)
     }
 
     imageBufferSize = imageSizeBytes;
-
-//    unsigned char** buff_ptr = imageBufferAddr.get();
-
-//    // init to nullptr
-//    for ( size_t i = 0; i < imageBuffersNumber; ++i ) {
-//        buff_ptr[i] = nullptr;
-//    }
-
-//    // allocate memory for image buffers (use of alignment required by SDK)
-////    char addr[20];
-//    for ( size_t i = 0; i < imageBuffersNumber; ++i ) {
-//#ifdef _MSC_VER
-//#if _MSC_VER > 1800
-//        alignas(8) unsigned char* pbuff = new unsigned char[imageSizeBytes];
-//#else // compile with VS 2013
-//        __declspec(align(8))  unsigned char* pbuff = new unsigned char[imageSizeBytes];
-//#endif
-//#else
-//        alignas(8) unsigned char* pbuff = new unsigned char[imageSizeBytes];
-//#endif
-
-//        buff_ptr[i] = pbuff;
-
-//        queueBuffer(buff_ptr[i], imageSizeBytes);
-//    }
 }
 
-
-//void ANDOR_Camera::deleteImageBuffers()
-//{
-//    if ( !imageBufferAddr ) return;
-
-//    std::string log_str;
-
-//    flush();
-
-//    unsigned char** buff_ptr = imageBufferAddr.get();
-
-//    for ( size_t i = 0; i < imageBuffersNumber; ++i ) {
-//        if ( logLevel == ANDOR_Camera::LOG_LEVEL_VERBOSE ) {
-//            log_str = std::string("Delete image buffer at address: ") + pointer_to_str(buff_ptr[i]);
-//            logToFile(ANDOR_Camera::CAMERA_INFO,log_str,1);
-//        }
-//        delete[] buff_ptr[i];
-//    }
-//}
 
 
                             /*  STATIC PUBLIC METHODS  */
@@ -792,8 +725,6 @@ void ANDOR_Camera::allocateImageBuffers(int imageSizeBytes)
                     /*  ANDOR_CameraInfo constructor */
 
 ANDOR_CameraInfo::ANDOR_CameraInfo():
-//  cameraModel(L"Unknown"), cameraName(L"Unknown"), serialNumber(L"Unknown"),
-//  controllerID(L"Unknown"), interfaceType(L"Unknown")
     cameraModel(), cameraName(), serialNumber(),
     controllerID(), interfaceType(), device_index(-1),
     sensorWidth(0), sensorHeight(0), pixelWidth(0), pixelHeight(0)
