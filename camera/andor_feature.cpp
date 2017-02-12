@@ -230,7 +230,8 @@ void ANDOR_Camera::ANDOR_Feature::getString()
         try {
             str = new AT_WC[len];
         } catch (std::bad_alloc &ex ) {
-            throw AndorSDK_Exception(AT_ERR_NOMEMORY, "Can not allocate memory for AT_WC* string!");
+            throw AndorSDK_Exception(AT_ERR_NOMEMORY, std::string("Can not allocate memory for AT_WC* string!") +
+                                     " (bad_alloc what(): " + ex.what() + ")");
         }
 
         formatLogMessage("AT_GetString","str",len);

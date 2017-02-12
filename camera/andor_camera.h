@@ -65,7 +65,7 @@ public:
     enum LOG_IDENTIFICATOR {CAMERA_INFO, SDK_ERROR, CAMERA_ERROR, BLANK};
     enum LOG_LEVEL {LOG_LEVEL_VERBOSE, LOG_LEVEL_ERROR, LOG_LEVEL_QUIET};
     enum AndorFeatureType {UnknownType = -1, BoolType, IntType, FloatType, StringType, EnumType};
-    enum CAMERA_IDENT_TAG {CameraModel, CameraName, SerialNumber, ControllerID};
+    enum CAMERA_IDENT_TAG {CameraName, CameraModel, SerialNumber, CameraFamily, SensorModel};
 
     // type for the valid SDK features list: map<"NAME","TYPE">
 
@@ -348,7 +348,7 @@ public:
     static ANDOR_Feature DeviceCount;
     static ANDOR_Feature SoftwareVersion;
 
-    static std::list<ANDOR_CameraInfo> getFoundCameras() {return foundCameras;};
+    static std::list<ANDOR_CameraInfo> getFoundCameras() {return foundCameras;}
 
            /*  logging methods */
 
@@ -386,7 +386,8 @@ protected:
     void allocateImageBuffers(int imageSizeBytes);  // allocate image buffers
 
 
-    std::list<CallbackContext*> callbackContextPtr;
+//    std::list<CallbackContext*> callbackContextPtr;
+    std::list<std::unique_ptr<CallbackContext>>  callbackContextPtr;
 
                 /*  static class members and methods  */
 
@@ -534,18 +535,34 @@ struct ANDOR_API_WRAPPER_EXPORT ANDOR_CameraInfo
 {
     ANDOR_CameraInfo();
 
-    ANDOR_StringFeature cameraModel;
-    ANDOR_StringFeature cameraName;
-    ANDOR_StringFeature serialNumber;
-    ANDOR_StringFeature controllerID;
+    // CMOS and Apogee cameras common string features
+    andor_string_t cameraName;
+    andor_string_t interfaceType;
+    andor_string_t firmwareVersion;
+
+    // CMOS cameras implemented string features
+    andor_string_t cameraModel;
+    andor_string_t serialNumber;
+    andor_string_t controllerID;
+
+    // Apogee cameras implemented string features
+    andor_string_t cameraFamily;
+    andor_string_t DDR2Type;
+    andor_string_t driverVersion;
+    andor_string_t microcodeVersion;
+    andor_string_t sensorModel;
+    andor_string_t sensorType;
+
+    // sensor geometrical info
     AT_64 sensorWidth;
     AT_64 sensorHeight;
+
     double pixelWidth; // in micrometers
     double pixelHeight;
-    ANDOR_StringFeature interfaceType;
+
     int device_index;
 
-    enum ANDOR_CameraInfoType {CameraModel, CameraName, SerialNumber, ControllerID};
+    enum ANDOR_CameraInfoType {CameraName, CameraModel, SerialNumber, CameraFamily, SensorModel};
 };
 
 

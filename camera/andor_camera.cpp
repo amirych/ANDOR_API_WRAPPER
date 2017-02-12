@@ -65,7 +65,7 @@ static std::string time_stamp()
 
 static int AT_EXP_CONV feature_callback(AT_H hndl, const AT_WC* name, void* context)
 {
-    if ( context == nullptr ) return AT_ERR_INVALIDHANDLE; // just check (should not be NULL!!!)
+    if ( context == nullptr ) return AT_ERR_NULL_VALUE; // just check (should not be NULL!!!)
 
     CallbackContext* _context = (CallbackContext*)context;
 
@@ -99,12 +99,9 @@ ANDOR_Camera::ANDOR_Camera():
     callbackContextPtr(),
     ANDOR_SDK_FEATURES(DEFAULT_ANDOR_SDK_FEATURES)
 {
-    // camera handler for "CameraPresent"
-    // and "CameraAcquiring" features will be
-    // set in connectToCamera method as at this point there is still no camera handle!!!
+    setLogLevel(logLevel); // to initialize or disable extra logging facility
 
-    setLogLevel(logLevel); // needed to initialize or disable extra logging facility
-
+    // if it is the first object initialize ANDOR SDK library and scan currently connected cameras
     if ( !numberOfCreatedObjects ) {
         lastError = AT_InitialiseLibrary();
         if ( lastError != AT_SUCCESS ) return;
@@ -124,15 +121,17 @@ ANDOR_Camera::~ANDOR_Camera()
 {
     --numberOfCreatedObjects;
 
+    if ( cameraHndl != AT_HANDLE_UNINITIALISED ) AT_Close(cameraHndl); // !!! DOES ONE NEED IT REALLY (check of cameraHndl)
+
     if ( !numberOfCreatedObjects ) {
         AT_FinaliseLibrary();
     }
 
 
     // delete callback helper structures if it exist
-    if ( callbackContextPtr.size() ) {
-        for ( auto it = callbackContextPtr.begin(); it != callbackContextPtr.end(); ++it ) delete *it;
-    }
+//    if ( callbackContextPtr.size() ) {
+//        for ( auto it = callbackContextPtr.begin(); it != callbackContextPtr.end(); ++it ) delete *it;
+//    }
 }
 
 
@@ -263,13 +262,16 @@ bool ANDOR_Camera::connectToCamera(const ANDOR_Camera::CAMERA_IDENT_TAG ident_ta
         case ANDOR_Camera::SerialNumber:
             log_str += "'SerialNumber'";
             break;
-        case ANDOR_Camera::ControllerID:
-            log_str += "'ControllerID'";
+        case ANDOR_Camera::CameraFamily:
+            log_str += "'CameraFamily'";
             break;
-        default:
-            log_str += "'unknown identifier' tag!!! Cannot open a camera!!!";
-            logToFile(ANDOR_Camera::CAMERA_ERROR,log_str);
-            return false; // unknown type!
+        case ANDOR_Camera::SensorModel:
+            log_str += "'SensorModel'";
+            break;
+            default:
+                log_str += "'unknown identifier' tag!!! Cannot open a camera!!!";
+                logToFile(ANDOR_Camera::CAMERA_ERROR,log_str);
+                return false; // unknown type!
     }
 
     log_str += " tag ...";
@@ -281,20 +283,24 @@ bool ANDOR_Camera::connectToCamera(const ANDOR_Camera::CAMERA_IDENT_TAG ident_ta
     for ( ANDOR_CameraInfo info: foundCameras ) {
         switch (ident_tag) {
             case ANDOR_Camera::CameraModel:
-                if ( info.cameraModel.value().empty() ) break;
-                ok = info.cameraModel.value().compare(tag_str);
+                if ( info.cameraModel.empty() ) break;
+                ok = info.cameraModel.compare(tag_str);
                 break;
             case ANDOR_Camera::CameraName:
-                if ( info.cameraName.value().empty() ) break;
-                ok = info.cameraName.value().compare(tag_str);
+                if ( info.cameraName.empty() ) break;
+                ok = info.cameraName.compare(tag_str);
                 break;
             case ANDOR_Camera::SerialNumber:
-                if ( info.serialNumber.value().empty() ) break;
-                ok = info.serialNumber.value().compare(tag_str);
+                if ( info.serialNumber.empty() ) break;
+                ok = info.serialNumber.compare(tag_str);
                 break;
-            case ANDOR_Camera::ControllerID:
-                if ( info.controllerID.value().empty() ) break;
-                ok = info.controllerID.value().compare(tag_str);
+            case ANDOR_Camera::CameraFamily:
+                if ( info.cameraFamily.empty() ) break;
+                ok = info.cameraFamily.compare(tag_str);
+                break;
+            case ANDOR_Camera::SensorModel:
+                if ( info.sensorModel.empty() ) break;
+                ok = info.sensorModel.compare(tag_str);
                 break;
         }
 
@@ -360,10 +366,12 @@ void ANDOR_Camera::registerFeatureCallback(andor_string_t feature_name, const ca
     }
 
     CallbackContext *_context = new CallbackContext();
-    callbackContextPtr.push_back(_context);
+//    callbackContextPtr.push_back(_context);
 
     _context->func = func;
     _context->user_context = context;
+
+    callbackContextPtr.push_back(std::unique_ptr<CallbackContext>(_context));
 
     std::wstring_convert<std::codecvt_utf8<AT_WC>> cvt;
     log_str = "Try to register '" + cvt.to_bytes(feature_name) +  "'-feature callback function ...";
@@ -611,6 +619,7 @@ int ANDOR_Camera::scanConnectedCameras()
     AT_H hndl;
 
     ANDOR_FeatureInfo f_info;
+    ANDOR_StringFeature s_f;
 
     if ( foundCameras.size() ) foundCameras.clear();
 
@@ -619,28 +628,99 @@ int ANDOR_Camera::scanConnectedCameras()
         int err = AT_Open(i,&hndl);
         if ( err == AT_SUCCESS ) {
             ANDOR_CameraInfo info;            
-            ANDOR_Feature feature(hndl,L"CameraModel");
+            ANDOR_Feature feature(hndl,L"");
             feature.setType(ANDOR_Camera::StringType);
 
-            f_info = feature;
-            if ( f_info.isImplemented() ) info.cameraModel = feature;
-
+            // common info
             feature.setName(L"CameraName");
             f_info = feature;
-            if ( f_info.isImplemented() ) info.cameraName = feature;
-
-            feature.setName(L"SerialNumber");
-            f_info = feature;
-            if ( f_info.isImplemented() ) info.serialNumber = feature;
-
-            feature.setName(L"ControllerID");
-            f_info = feature;
-            if ( f_info.isImplemented() ) info.controllerID = feature;
+            if ( f_info.isImplemented() ) {
+                s_f = feature;
+                info.cameraName = s_f.value();
+            }
 
             feature.setName(L"InterfaceType");
             f_info = feature;
-            if ( f_info.isImplemented() ) info.interfaceType = feature;
+            if ( f_info.isImplemented() ) {
+                s_f = feature;
+                info.interfaceType = s_f.value();
+            }
 
+            feature.setName(L"FirmwareVersion");
+            f_info = feature;
+            if ( f_info.isImplemented() ) {
+                s_f = feature;
+                info.firmwareVersion = s_f.value();
+            }
+
+            // CMOS
+            feature.setName(L"CameraModel");
+            f_info = feature;
+            if ( f_info.isImplemented() ) {
+                s_f = feature;
+                info.cameraModel = s_f.value();
+            }
+
+            feature.setName(L"SerialNumber");
+            f_info = feature;
+            if ( f_info.isImplemented() ) {
+                s_f = feature;
+                info.serialNumber = s_f.value();
+            }
+
+            feature.setName(L"ControllerID");
+            f_info = feature;
+            if ( f_info.isImplemented() ) {
+                s_f = feature;
+                info.controllerID = s_f.value();
+            }
+
+
+            // Apogee
+            feature.setName(L"CameraFamily");
+            f_info = feature;
+            if ( f_info.isImplemented() ) {
+                s_f = feature;
+                info.cameraFamily = s_f.value();
+            }
+
+            feature.setName(L"DDR2Type");
+            f_info = feature;
+            if ( f_info.isImplemented() ) {
+                s_f = feature;
+                info.DDR2Type = s_f.value();
+            }
+
+            feature.setName(L"DriverVersion");
+            f_info = feature;
+            if ( f_info.isImplemented() ) {
+                s_f = feature;
+                info.driverVersion = s_f.value();
+            }
+
+            feature.setName(L"MicrocodeVersion");
+            f_info = feature;
+            if ( f_info.isImplemented() ) {
+                s_f = feature;
+                info.microcodeVersion = s_f.value();
+            }
+
+            feature.setName(L"SensorModel");
+            f_info = feature;
+            if ( f_info.isImplemented() ) {
+                s_f = feature;
+                info.sensorModel = s_f.value();
+            }
+
+            feature.setName(L"SensorType");
+            f_info = feature;
+            if ( f_info.isImplemented() ) {
+                s_f = feature;
+                info.sensorType = s_f.value();
+            }
+
+
+            // geometrical info
             feature.setName(L"SensorWidth");
             feature.setType(ANDOR_Camera::IntType);
             f_info = feature;
@@ -725,9 +805,12 @@ void ANDOR_Camera::allocateImageBuffers(int imageSizeBytes)
                     /*  ANDOR_CameraInfo constructor */
 
 ANDOR_CameraInfo::ANDOR_CameraInfo():
-    cameraModel(), cameraName(), serialNumber(),
-    controllerID(), interfaceType(), device_index(-1),
-    sensorWidth(0), sensorHeight(0), pixelWidth(0), pixelHeight(0)
+    cameraName(), interfaceType(), firmwareVersion(),
+    cameraModel(), serialNumber(), controllerID(),
+    cameraFamily(), DDR2Type(), driverVersion(),
+    microcodeVersion(), sensorModel(), sensorType(),
+    sensorWidth(0), sensorHeight(0), pixelWidth(0), pixelHeight(0),
+    device_index(-1)
 {
 }
 

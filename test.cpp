@@ -8,13 +8,15 @@ int main()
     ANDOR_Camera cam;
     ANDOR_StringFeature ef;
 
+//    std::pair<float,float> ff = cam["dede"];
+
     std::list<ANDOR_CameraInfo> ii = cam.getFoundCameras();
     if ( ii.size() ) {
         std::cout << "Found cameras: \n";
         for ( ANDOR_CameraInfo &inf: ii) {
-            std::wcout << "  NAME: " << inf.cameraName.value() << "\n";
-            std::wcout << "  MODEL: " << inf.cameraModel.value() << "\n";
-            std::wcout << "  SERIAL: " << inf.serialNumber.value() << "\n";
+            std::wcout << "  NAME: " << inf.cameraName << "\n";
+            std::wcout << "  MODEL: " << inf.cameraModel << "\n";
+            std::wcout << "  SERIAL: " << inf.serialNumber << "\n";
         }
         std::cout << "\n";
     }
